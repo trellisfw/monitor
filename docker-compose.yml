@@ -1,0 +1,43 @@
+version: '3'
+
+services:
+  ##########################################
+  # Overrides for oada-core services:
+  ##########################################
+
+  admin:
+    volumes:
+      - ./services-available/trellis-monitis/scopes.js:/code/scopes/additional-scopes/monitis_scopes.js
+      - ./services-available/trellis-monitis:/code/trellis-monitis
+
+  permissions-handler:
+    volumes:
+      - ./services-available/trellis-monitis/scopes.js:/code/scopes/additional-scopes/monitis_scopes.js
+
+  # Add our proxy route to nginx
+  proxy:
+    volumes:
+      - ./services-available/trellis-monitis/nginx.conf:/etc/nginx/additional-locations/trellis-monitis.conf
+
+  ###############################################
+  # This service's definition:
+  ###############################################
+
+  trellis-monitis:
+    build:
+      context: ./services-available/trellis-monitis
+    container_name: trellis-monitis
+    ports:
+      - 8889:8889
+    restart: always
+    networks:
+      - http_net
+      - startup_net
+    volumes:
+      - ./services-available/trellis-monitis:/code/trellis-monitis
+      - ./oada-core/libs:/code/libs
+      - ./oada-srvc-docker-config.js:/oada-srvc-docker-config.js
+    environment:
+      - NODE_TLS_REJECT_UNAUTHORIZED
+      - NODE_ENV=${NODE_ENV:-development}
+      - DEBUG=${DEBUG:-*info*,*warn*,*error*}
