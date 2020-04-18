@@ -84,7 +84,7 @@ app.get('/monitis-monitor', async (req, res) => {
             trace('received change, but was not to the new key.  change was: ', change);
             return;
           }
-          info(`Received change on ${newkey}, will check if it is meta as "asset created"`);
+          trace(`Received change on ${newkey}, will check if it is meta as "asset created"`);
           const meta = change.body[newkey]._meta;
           trace('change meta = ', meta);
           if (!meta) {
@@ -116,6 +116,7 @@ app.get('/monitis-monitor', async (req, res) => {
       }
     });
     const success_rev = await p;
+    info('Overall test successful on key ',newkey);
     res.json({ success: true, message: `ASN push to IFT succeeded on id ${newkey} on rev ${success_rev}` });
   } catch(e) {
     error('FAILED waiting for success, never saw it');
