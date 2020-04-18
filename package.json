@@ -14,9 +14,11 @@
   "dependencies": {
     "@oada/oada-jobs": "oada/oada-jobs",
     "@trellisfw/signatures": "^2.1.0",
+    "bluebird": "^3.7.2",
     "debug": "^4.1.1",
     "express": "^4.17.1",
     "lodash": "^4.17.15",
+    "minimist": "^1.2.5",
     "moment": "^2.24.0",
     "nconf": "^0.10.0",
     "uuid": "^7.0.2"
