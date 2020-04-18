@@ -44,6 +44,7 @@ app.get('/monitis-monitor', async (req, res) => {
     const queue = await con.get({ path: '/bookmarks/services/target/jobs' });
     const validkeys = _.filter(_.keys(queue), k => !k.match(/^_/)); // remove any OADA keys like _id, _rev, _meta
     if (validkeys.length > 10) {
+      error('Target job queue is longer than 10 items, not posting new ASN');
       throw new Error('Target job queue is longer than 10 items, not posting new ASN');
     }
     
