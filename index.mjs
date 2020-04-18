@@ -36,12 +36,18 @@ app.get('/monitis-monitor', async (req, res) => {
     trace('Not the right token');
     return res.end();
   }
-  info('Received valid request, sending ASN and waiting for response')
 
   let newkey = false;
   const con = await oada.connect({domain,token:tokenToRequestAgainstOADA,cache:false});
   try {
-    trace('Connected to OADA, posting ASN');
+    trace('Connected to OADA, retrieving current target job queue');
+    const queue = await con.get({ path: '/bookmarks/services/target/jobs' });
+    const validkeys = _.filter(_.keys(queue), k => !k.match(/^_/)); // remove any OADA keys like _id, _rev, _meta
+    if (validkeys.length > 10) {
+      throw new Error('Target job queue is longer than 10 items, not posting new ASN');
+    }
+    
+    trace('Job queue sufficiently small (< 10), posting test ASN');
 
     const now = moment().utc().format('X');
     const rand = uuid.v4().replace(/-/g,'').slice(0,15);
@@ -55,7 +61,7 @@ app.get('/monitis-monitor', async (req, res) => {
       error('FAILED to post ASN to asn-staging!  error was: ', e);
       throw new Error('FAILED to post ASN to asn-staging!  error was: '+JSON.stringify(e,false,'  '));
     });
-    trace('Document posted to asn-staging as new key',newkey);
+    info('Document posted to asn-staging as new key',newkey);
 
     const p = new Promise(async (resolve,reject) => {
       try {
@@ -103,7 +109,7 @@ app.get('/monitis-monitor', async (req, res) => {
           watch: { callback: watchHandler }
         });
       } catch(e) {
-        error('FIRST CATCH');
+        error('FAILED waiting for success, never saw it');
         res.json({ error: true, message: JSON.stringify(e,false,'  ') });
         throw e;
       }
@@ -111,7 +117,7 @@ app.get('/monitis-monitor', async (req, res) => {
     const success_rev = await p;
     res.json({ success: true, message: `ASN push to IFT succeeded on id ${newkey} on rev ${success_rev}` });
   } catch(e) {
-    error('SECOND CATCH');
+    error('FAILED waiting for success, never saw it');
     res.json({ error: true, message: JSON.stringify(e,false,'  ') });
   } finally {
     // Delete the asn-staging entry, the asns entry, and the resource itself
