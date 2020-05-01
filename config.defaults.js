@@ -17,5 +17,6 @@ export default {
   domain: 'proxy',
   incomingToken: 'god',
   tokenToRequestAgainstOADA: 'god',
-  timeout: 45*1000, // ms
+  timeout: 10*60*1000, // 10 minutes
+  postInterval: 30*60*1000, // post every half an hour
 }

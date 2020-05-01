@@ -21,10 +21,14 @@ const port = 80; // proxy routes https://<domain>/monitis-monitor to us on 80
 const incomingToken = config.get('incomingToken');
 const tokenToRequestAgainstOADA = config.get('tokenToRequestAgainstOADA');
 const timeout = config.get('timeout');
+const postInterval = config.get('postInterval');
 let domain = config.get('domain');
 if (!domain.match(/^http/)) domain = 'https://'+domain;
 
-trace('timeout = ', timeout);
+info('Starting monitor with timeout = ', timeout, ', postInterval = ', postInterval);
+
+let currentlysuccess = false;
+let latestmessage = "Started";
 
 app.get('/monitis-monitor', async (req, res) => {
 
@@ -37,6 +41,19 @@ app.get('/monitis-monitor', async (req, res) => {
     return res.end();
   }
 
+  if (currentlysuccess) {
+    info('Responding with success, latestmessage = ', latestmessage);
+    res.json({ success: true, message: latestmessage });
+  } else {
+    error('ERROR: responding with error, latestmessage = ', latestmessage);
+    res.json({ error: true, message: latestmessage });
+  }
+
+  res.end();
+});
+
+
+async function postOne() {
   let newkey = false;
   const con = await oada.connect({domain,token:tokenToRequestAgainstOADA,cache:false});
   try {
@@ -117,10 +134,12 @@ app.get('/monitis-monitor', async (req, res) => {
     });
     const success_rev = await p;
     info('Overall test successful on key ',newkey);
-    res.json({ success: true, message: `ASN push to IFT succeeded on id ${newkey} on rev ${success_rev}` });
+    currentlysuccess = true;
+    latestmessage = `ASN push to IFT succeeded on id ${newkey} on rev ${success_rev}`;
   } catch(e) {
     error('FAILED waiting for success, never saw it');
-    res.json({ error: true, message: JSON.stringify(e,false,'  ') });
+    currentlysuccess = false;
+    latestmessage = JSON.stringify(e,false,'  ');
   } finally {
     // Delete the asn-staging entry, the asns entry, and the resource itself
     if (newkey) {
@@ -145,11 +164,17 @@ app.get('/monitis-monitor', async (req, res) => {
       }
       */
     }
-    res.end();
     con.disconnect();
     trace('DONE!');
   }
-  
 });
 
+// Start the express server listening for requests:
 app.listen(port, () => console.log(`Monitis monitor listening on port ${port}`))
+
+// Start a repeating timer to keep posting ASN's:
+(async () => {
+  // post one right away, then set interval to repeatedly keep posting every half an hour
+  await postOne();
+  setInterval(postOne, postInterval);
+});
