@@ -3,7 +3,6 @@
   "version": "1.0.0",
   "description": "A Trellis microservice to respond to monitor pings, spawn and check things internall, and respond with success or fail",
   "main": "index.mjs",
-  "type": "module",
   "scripts": {
     "start": "node index.mjs"
   },

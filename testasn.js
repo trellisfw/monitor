@@ -3,7 +3,7 @@ export default {
   "ZSHPMNT05": {
     "IDOC": {
       "EDI_DC40": {
-        "istest": true, // HERE IS THE TEST KEY!!!
+        "TEST_ASN": true,
         "TABNAM": "EDI_DC40",
         "MANDT": "240",
         "DOCNUM": "0000000034125709",
@@ -567,4 +567,4 @@ export default {
       "_BEGIN": "1"
     }
   }
-};
+}
