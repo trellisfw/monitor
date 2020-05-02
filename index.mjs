@@ -42,10 +42,10 @@ app.get('/monitis-monitor', async (req, res) => {
   }
 
   if (currentlysuccess) {
-    info('Responding with success, latestmessage = ', latestmessage);
+    info('Responding to monitis with success, latestmessage = ', latestmessage);
     res.json({ success: true, message: latestmessage });
   } else {
-    error('ERROR: responding with error, latestmessage = ', latestmessage);
+    error('ERROR: responding to monitis with error, latestmessage = ', latestmessage);
     res.json({ error: true, message: latestmessage });
   }
 
@@ -117,7 +117,8 @@ async function postOne() {
           const str = JSON.stringify(target);
           if (str.match(/asset[ _-]+created/i)) {
             trace('received change, asset is created, resolving promise');
-            return resolve(change._rev);
+            trace('successful change was: ', change);
+            return resolve(change.body[newkey]._rev);
           }
           trace('received change, but nothing matches "asset created"');
         }
@@ -167,14 +168,14 @@ async function postOne() {
     con.disconnect();
     trace('DONE!');
   }
-});
+}
 
 // Start the express server listening for requests:
-app.listen(port, () => console.log(`Monitis monitor listening on port ${port}`))
+app.listen(port, () => console.log(`Monitis monitor listening on port ${port}`));
 
 // Start a repeating timer to keep posting ASN's:
 (async () => {
   // post one right away, then set interval to repeatedly keep posting every half an hour
   await postOne();
   setInterval(postOne, postInterval);
-});
+})();
