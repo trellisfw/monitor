@@ -7,26 +7,26 @@ services:
 
   admin:
     volumes:
-      - ./services-available/trellis-monitis/scopes.js:/code/scopes/additional-scopes/monitis_scopes.js
-      - ./services-available/trellis-monitis:/code/trellis-monitis
+      - ./services-available/trellis-monitor/scopes.js:/code/scopes/additional-scopes/monitor_scopes.js
+      - ./services-available/trellis-monitor:/code/trellis-monitor
 
   permissions-handler:
     volumes:
-      - ./services-available/trellis-monitis/scopes.js:/code/scopes/additional-scopes/monitis_scopes.js
+      - ./services-available/trellis-monitor/scopes.js:/code/scopes/additional-scopes/monitor_scopes.js
 
   # Add our proxy route to nginx
   proxy:
     volumes:
-      - ./services-available/trellis-monitis/nginx.conf:/etc/nginx/additional-locations/trellis-monitis.conf
+      - ./services-available/trellis-monitor/nginx.conf:/etc/nginx/additional-locations/trellis-monitor.conf
 
   ###############################################
   # This service's definition:
   ###############################################
 
-  trellis-monitis:
+  trellis-monitor:
     build:
-      context: ./services-available/trellis-monitis
-    container_name: trellis-monitis
+      context: ./services-available/trellis-monitor
+    container_name: trellis-monitor
     ports:
       - 8889:8889
     restart: always
@@ -34,7 +34,7 @@ services:
       - http_net
       - startup_net
     volumes:
-      - ./services-available/trellis-monitis:/code/trellis-monitis
+      - ./services-available/trellis-monitor:/code/trellis-monitor
       - ./oada-core/libs:/code/libs
       - ./oada-srvc-docker-config.js:/oada-srvc-docker-config.js
     environment:

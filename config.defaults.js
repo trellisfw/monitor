@@ -13,10 +13,13 @@
  * limitations under the License.
  */
 
-export default {
+module.exports = {
   domain: 'proxy',
   incomingToken: 'god',
   tokenToRequestAgainstOADA: 'god',
   timeout: 10*60*1000, // 10 minutes
   postInterval: 30*60*1000, // post every half an hour
+  testInterval: 15, // every 15 mins
+  notifyurl: false,
+  port: 80, // Port you can hit to get current status
 }

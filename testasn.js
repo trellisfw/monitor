@@ -1,4 +1,4 @@
-export default {
+module.exports = {
   _type: 'application/vnd.trellisfw.asn.sf.1+json',
   "ZSHPMNT05": {
     "IDOC": {

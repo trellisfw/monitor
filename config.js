@@ -14,7 +14,7 @@
  */
 
 // TODO: Publish this to npm instead?
-import libConfig from './lib-config.cjs'
-import config from './config.defaults.js'
+const libConfig = require('./lib-config');
+const config = require('./config.defaults.js');
 
-export default libConfig(config)
+module.exports = libConfig(config)

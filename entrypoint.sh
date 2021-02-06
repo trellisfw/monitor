@@ -1,6 +1,6 @@
 #! /bin/bash
 
-SERVICE_ROOT="/code/trellis-monitis"
+SERVICE_ROOT="/code/trellis-monitor"
 
 chmod u+x ${SERVICE_ROOT}/wait-for-it.sh && \
   ${SERVICE_ROOT}/wait-for-it.sh startup:80 -t 0 && \
