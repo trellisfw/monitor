@@ -14,7 +14,7 @@
  */
 
 module.exports = {
-  domain: 'proxy',
+  domain: 'localhost',
   incomingToken: 'god',
   tokenToRequestAgainstOADA: 'god',
   timeout: 10*60*1000, // 10 minutes

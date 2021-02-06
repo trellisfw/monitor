@@ -4,9 +4,16 @@ const ksuid = require('ksuid');
 const { pathTest, revAge, staleKsuidKeys } = require('../testers');
 const Promise = require('bluebird');
 const tiny = require('tiny-json-http');
+const debug = require('debug');
 
 const config = require('../config');
 const interval = config.get('interval');
+
+const trace = debug('trellis-monitor:trace');
+
+const domain = config.get('domain');
+const token = config.get('tokenToRequestAgainstOADA');
+trace(`Connecting to oada w/ domain = ${domain} and token = ${token}`);
 
 const tree = {
   bookmarks: {
@@ -34,41 +41,40 @@ const tree = {
 
 // In watch mode, these tests need to wait for service to restart.  package.json adds `--delay` to 
 // mocha in this case: it will wait to run our tests until we call "run".  Code for that is at bottom.
-(async () => {
 
-  describe('service', () => {
-  
-    let oada = false;
-    before(async () => {
-      oada = await connect({ domain: 'localhost', token: 'proxy' });
-      // Setup the trees that it is expecting to be there
-      await ensurePath(`/bookmarks/trellisfw/asn-staging`, oada);
-      await ensurePath(`/bookmarks/trellisfw/asns`, oada);
-      await ensurePath(`/bookmarks/services/target/jobs`, oada);
-    });
+describe('service', () => {
 
-    it('should fail on check after posting stale asn-staging ksuid key', async () => {
-      const oldksuid = ksuid.randomSync(new Date('2021-02-03T01:00:00Z'))
-      await oada.put({ 
-        path: `/bookmarks/trellisfw/asn-staging`, 
-        data: { [oldksuid]: { istest: true } },
-        _type: 'application/json',
-      });
-      const res = await tiny.get({ url: `http://localhost:${config.get('port')}/trigger` });
-      const status = _.get(res.body, 'tests.staging-clean');
-      expect(status).to.deep.equal({ status: 'success' });
-    });
-   
+  let oada = false;
+  before(async () => {
+    oada = await connect({ domain, token, connection: 'http' });
+    // Setup the trees that it is expecting to be there
+    await ensurePath(`/bookmarks/trellisfw/asn-staging`, oada);
+    await ensurePath(`/bookmarks/trellisfw/asns`, oada);
+    await ensurePath(`/bookmarks/services/target/jobs`, oada);
   });
 
-  if (run) {
-    console.log('--delay passed, waiting 2 seconds before starting service tests');
-    await Promise.delay(2000);
+  it('should fail on check after posting stale asn-staging ksuid key', async () => {
+    const oldksuid = ksuid.randomSync(new Date('2021-02-03T01:00:00Z'))
+    await oada.put({ 
+      path: `/bookmarks/trellisfw/asn-staging`, 
+      data: { [oldksuid]: { istest: true } },
+      _type: 'application/json',
+    });
+    const res = await tiny.get({ url: `http://localhost:${config.get('port')}/trigger` });
+    const status = _.get(res.body, 'tests.staging-clean');
+    expect(status).to.deep.equal({ status: 'success' });
+  });
+ 
+});
+
+if (run) {
+  console.log('--delay passed, waiting 2 seconds before starting service tests');
+  Promise.delay(2000)
+  .then(() => {;
     console.log('Done waiting, starting service tests');
     run();
-  }
-
-})();
+  });
+}
 
 async function ensurePath(path, oada) {
   await oada.head({path}).catch(async e => {

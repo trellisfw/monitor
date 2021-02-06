@@ -5,8 +5,8 @@
   "main": "index.js",
   "scripts": {
     "start": "if [ \"$NODE_ENV\" = \"production\" ]; then forever -w --watchDirectory=. --watchIgnore=node_modules start index.js; else nodemon index.js; fi",
-    "test": "NODE_TLS_REJECT_UNAUTHORIZED=0 DEBUG=\"trellis-monitor:*\" mocha",
-    "watch": "port=9000 NODE_TLS_REJECT_UNAUTHORIZED=0 DEBUG=\"trellis-monitor:*\" concurrently \"npm run start\" \"npm run test -- -w --delay\""
+    "test": "NODE_TLS_REJECT_UNAUTHORIZED=0 DEBUG=\"${DEBUG},trellis-monitor:*\" mocha",
+    "watch": "port=9000 NODE_TLS_REJECT_UNAUTHORIZED=0 DEBUG=\"${DEBUG},trellis-monitor:*\" concurrently \"npm run start\" \"npm run test -- -w --delay\""
   },
   "repository": "https://gitlab.com/qlevercompany/trellis/trellis-signer",
   "author": "Aaron Ault <aultac@gmail.com>",
