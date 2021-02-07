@@ -11,6 +11,7 @@ const cron = require('node-cron');
 const tiny = require('tiny-json-http');
 
 const testers = require('./testers');
+const notifiers = require('./notifiers');
 
 const config = require('./config.js');
 const testasn = require('./testasn.js');
@@ -28,10 +29,10 @@ const timeout = config.get('timeout');
 const postInterval = config.get('postInterval');
 let domain = config.get('domain');
 if (!domain.match(/^http/)) domain = 'https://'+domain;
-const interval = config.get('interval') || 15;
+const cronschedule = config.get('cron') || "* */15 * * * *";
 const notifyurl = config.get('notifyurl') || false;
 
-info('Starting monitor with interval = ', interval);
+info('Starting monitor with cron = ', cronschedule);
 
 const oada = await connect({
   domain,
@@ -145,7 +146,7 @@ const check = async () => {
     if (notifyurl) {
       trace(`Posting message to config.get('notifyurl') = ${notifyurl}`);
       try {
-        notifySlack(notifyurl, status);
+        notifiers.notifySlack(notifyurl, status);
       } catch(e) {
         error(`FAILED TO NOTIFY SLACK!  Error was: ${e.toString()}`);
       }
@@ -158,9 +159,9 @@ const check = async () => {
 // Run the check immediately on start, then schedule the intervals
 info(`Running initial check`);
 await check();
-info(`Completed initial check, starting re-check on ${interval}-min interval`);
-cron.schedule(`*/${interval} * * * *`, check);
-info(`Started monitor on 15-minute interval checks`);
+info(`Completed initial check, starting re-check on cron string ${cronschedule}`);
+cron.schedule(cronschedule, check);
+info(`Started monitor`);
 
 
 

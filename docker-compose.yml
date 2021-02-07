@@ -28,7 +28,7 @@ services:
       context: ./services-available/trellis-monitor
     container_name: trellis-monitor
     ports:
-      - 8889:8889
+      - 80
     restart: always
     networks:
       - http_net
@@ -41,3 +41,8 @@ services:
       - NODE_TLS_REJECT_UNAUTHORIZED
       - NODE_ENV=${NODE_ENV:-development}
       - DEBUG=${DEBUG:-*info*,*warn*,*error*}
+      - notifyurl
+      - domain
+      - tokenToRequestAgainstOADA
+      - incomingToken
+      - cron

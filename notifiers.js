@@ -5,7 +5,7 @@ const debug  = require('debug');
 const info = debug('trellis-monitor:info');
 const error = debug('trellis-monitor:error');
 
-const notifySlack = async (url, status) => {
+const notifySlack = async (notifyurl, status) => {
   const message = {
     "blocks": [
       {
