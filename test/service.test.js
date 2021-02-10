@@ -4,6 +4,7 @@ const ksuid = require('ksuid');
 const { pathTest, revAge, staleKsuidKeys } = require('../testers');
 const Promise = require('bluebird');
 const tiny = require('tiny-json-http');
+const _ = require('lodash');
 const debug = require('debug');
 
 const config = require('../config');
@@ -13,6 +14,7 @@ const trace = debug('trellis-monitor:trace');
 
 const domain = config.get('domain');
 const token = config.get('tokenToRequestAgainstOADA');
+const incomingToken = config.get('incomingToken');
 trace(`Connecting to oada w/ domain = ${domain} and token = ${token}`);
 
 const tree = {
@@ -54,15 +56,18 @@ describe('service', () => {
   });
 
   it('should fail on check after posting stale asn-staging ksuid key', async () => {
-    const oldksuid = ksuid.randomSync(new Date('2021-02-03T01:00:00Z'))
+    const oldksuid = ksuid.randomSync(new Date('2021-02-03T01:00:00Z')).string;
     await oada.put({ 
       path: `/bookmarks/trellisfw/asn-staging`, 
       data: { [oldksuid]: { istest: true } },
       _type: 'application/json',
     });
-    const res = await tiny.get({ url: `http://localhost:${config.get('port')}/trigger` });
+    const url = `http://localhost:${config.get('port')}/trigger`;
+    trace('Getting trigger at url ', url);
+    const res = await tiny.get({ url, headers: { authorization: `Bearer ${incomingToken}` }});
+    trace('Done w/ trigger, checking body');
     const status = _.get(res.body, 'tests.staging-clean');
-    expect(status).to.deep.equal({ status: 'success' });
+    expect(status.status).to.equal('failure');
   });
  
 });

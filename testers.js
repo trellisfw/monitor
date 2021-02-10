@@ -63,7 +63,7 @@ const staleKsuidKeys = async ({ path, maxage, oada }) => {
     if (errors.length > 0) {
       return { 
         status: 'failure', 
-        message: `Had ${errors.length} ksuid keys beyond maxage of ${maxage}: ${JSON.stringify(_.map(errors, strError))}` 
+        message: `Had ${errors.length} ksuid keys beyond maxage of ${maxage}: ${JSON.stringify(_.map(errors, e => e.string))}`,
       };
     }
     return { status: "success" };
