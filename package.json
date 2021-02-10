@@ -4,7 +4,7 @@
   "description": "A Trellis microservice to respond to monitor pings, spawn and check things internall, and respond with success or fail",
   "main": "index.js",
   "scripts": {
-    "start": "if [ \"$NODE_ENV\" = \"production\" ]; then forever -w --watchDirectory=. --watchIgnore=node_modules index.js; else nodemon index.js; fi",
+    "start": "if [ \"$NODE_ENV\" = \"production\" ]; then forever -w --watchIgnore=node_modules index.js; else nodemon index.js; fi",
     "test": "NODE_TLS_REJECT_UNAUTHORIZED=0 DEBUG=\"${DEBUG},trellis-monitor:*\" mocha",
     "watch": "port=9000 NODE_TLS_REJECT_UNAUTHORIZED=0 DEBUG=\"${DEBUG},trellis-monitor:*\" concurrently \"npm run start\" \"npm run test -- -w --delay\""
   },
