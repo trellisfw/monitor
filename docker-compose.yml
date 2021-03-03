@@ -1,42 +1,15 @@
-version: '3'
+version: '3.9'
 
 services:
-  ##########################################
-  # Overrides for oada-core services:
-  ##########################################
-
-  admin:
-    volumes:
-      - ./services-available/trellis-monitor/scopes.js:/code/scopes/additional-scopes/monitor_scopes.js
-      - ./services-available/trellis-monitor:/code/trellis-monitor
-
-  permissions-handler:
-    volumes:
-      - ./services-available/trellis-monitor/scopes.js:/code/scopes/additional-scopes/monitor_scopes.js
-
-  # Add our proxy route to nginx
-  proxy:
-    volumes:
-      - ./services-available/trellis-monitor/nginx.conf:/etc/nginx/additional-locations/trellis-monitor.conf
-
-  ###############################################
-  # This service's definition:
-  ###############################################
-
   trellis-monitor:
     build:
-      context: ./services-available/trellis-monitor
+      context: .
     container_name: trellis-monitor
     ports:
       - 80
-    restart: always
-    networks:
-      - http_net
-      - startup_net
+    restart: unless-stopped
     volumes:
-      - ./services-available/trellis-monitor:/code/trellis-monitor
-      - ./oada-core/libs:/code/libs
-      - ./oada-srvc-docker-config.js:/oada-srvc-docker-config.js
+      - .:/code/trellis-monitor
     environment:
       - NODE_TLS_REJECT_UNAUTHORIZED
       - NODE_ENV=${NODE_ENV:-development}
