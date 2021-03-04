@@ -1,0 +1,21 @@
+version: "3.9"
+
+services:
+
+  permissions-handler:
+    volumes:
+      - ./services/trellis-monitor/support/scopes.js:/code/scopes/additional-scopes/monitor_scopes.js
+
+  # Add our proxy route to nginx
+  proxy:
+    volumes:
+      - ./services/trellis-monitor/support/trellis-monitor.subfolder.conf:/config/nginx/proxy-confs/trellis-monitor.subfolder.conf
+
+  trellis-monitor:
+    extends:
+      file: ./services/trellis-monitor/docker-compose.yml
+      service: trellis-monitor
+    build:
+      context: ./services/trellis-monitor
+    volumes:
+      - ./services/trellis-monitor:/code/trellis-monitor
