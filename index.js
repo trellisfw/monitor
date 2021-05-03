@@ -229,7 +229,7 @@ const testasn = require('./testasn.js');
   );
 })();
 
-export async function postOne() {
+async function postOne() {
   let newkey = false;
   const con = await oada.connect({
     domain,
@@ -377,3 +377,5 @@ export async function postOne() {
     trace('DONE!');
   }
 }
+
+module.exports = { postOne };
