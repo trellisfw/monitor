@@ -17,4 +17,4 @@
 const libConfig = require('./lib-config');
 const config = require('./config.defaults.js');
 
-module.exports = libConfig(config)
+module.exports = libConfig(config);

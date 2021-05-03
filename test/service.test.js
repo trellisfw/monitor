@@ -21,8 +21,8 @@ const tree = {
   bookmarks: {
     _type: 'application/vnd.oada.bookmarks.1+json',
     trellisfw: {
-      _type: 'application/vnd.trellisfw.1+json',
-      asns: {
+      '_type': 'application/vnd.trellisfw.1+json',
+      'asns': {
         _type: 'application/vnd.trellisfw.asns.1+json',
       },
       'asn-staging': {
@@ -35,17 +35,16 @@ const tree = {
         _type: 'application/vnd.oada.service.1+json',
         jobs: {
           _type: 'applicaiton/vnd.oada.service.jobs.1+json',
-        }
-      }
-    }
-  }
-}
+        },
+      },
+    },
+  },
+};
 
-// In watch mode, these tests need to wait for service to restart.  package.json adds `--delay` to 
+// In watch mode, these tests need to wait for service to restart.  package.json adds `--delay` to
 // mocha in this case: it will wait to run our tests until we call "run".  Code for that is at bottom.
 
 describe('service', () => {
-
   let oada = false;
   before(async () => {
     oada = await connect({ domain, token, connection: 'http' });
@@ -57,38 +56,47 @@ describe('service', () => {
 
   it('should fail on check after posting stale asn-staging ksuid key', async () => {
     const oldksuid = ksuid.randomSync(new Date('2021-02-03T01:00:00Z')).string;
-    await oada.put({ 
-      path: `/bookmarks/trellisfw/asn-staging`, 
+    await oada.put({
+      path: `/bookmarks/trellisfw/asn-staging`,
       data: { [oldksuid]: { istest: true } },
       _type: 'application/json',
     });
     const url = `http://localhost:${config.get('port')}/trigger`;
     trace('Getting trigger at url ', url);
-    const res = await tiny.get({ url, headers: { authorization: `Bearer ${incomingToken}` }});
+    const res = await tiny.get({
+      url,
+      headers: { authorization: `Bearer ${incomingToken}` },
+    });
     trace('Done w/ trigger, checking body');
     const status = _.get(res.body, 'tests.staging-clean');
     expect(status.status).to.equal('failure');
   });
- 
 });
 
 if (run) {
-  console.log('--delay passed, waiting 2 seconds before starting service tests');
-  Promise.delay(2000)
-  .then(() => {;
+  console.log(
+    '--delay passed, waiting 2 seconds before starting service tests'
+  );
+  Promise.delay(2000).then(() => {
     console.log('Done waiting, starting service tests');
     run();
   });
 }
 
 async function ensurePath(path, oada) {
-  await oada.head({path}).catch(async e => {
+  await oada.head({ path }).catch(async (e) => {
     if (e.status === 404) {
-      console.log('ensurePath: path '+path+' did not exist before test, creating');
-      await oada.put({path, tree, data: {} });
+      console.log(
+        'ensurePath: path ' + path + ' did not exist before test, creating'
+      );
+      await oada.put({ path, tree, data: {} });
       return;
     }
-    console.log('ERROR: ensurePath: HEAD to path '+path+' returned non-404 error status: ', e);
+    console.log(
+      'ERROR: ensurePath: HEAD to path ' +
+        path +
+        ' returned non-404 error status: ',
+      e
+    );
   });
 }
-
