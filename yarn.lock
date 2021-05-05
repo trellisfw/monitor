@@ -38,7 +38,7 @@
     minimatch "^3.0.4"
     strip-json-comments "^3.1.1"
 
-"@oada/client@^2.3.0":
+"@oada/client@^2.4.1":
   version "2.4.1"
   resolved "https://registry.yarnpkg.com/@oada/client/-/client-2.4.1.tgz#de6a55c456f766034b49572915cf0a20257a260b"
   integrity sha512-HHTcxQ3g7ldXGBuevuu5Gr/Ii9PQMGtz5PK3vf3z9bgdl847QcwYSO1hgK6TXlNTjgHpIA0KFaCrsDt10D9gjQ==
