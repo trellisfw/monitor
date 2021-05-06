@@ -56,6 +56,7 @@ const config = convict({
       doc: 'Who to say we are when notifying. Defaults to oada.domain',
       format: String,
       default: '',
+      env: 'NAME',
     },
     url: {
       doc: 'URL to which to POST notifications',
