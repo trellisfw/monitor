@@ -42,9 +42,11 @@ let domain = config.get('oada.domain');
 if (!domain.match(/^http/)) {
   domain = 'https://' + domain;
 }
+
 const cronschedule = config.get('notify.cron');
 const notifyurl = config.get('notify.url');
 const timeout = config.get('timeout');
+const notifyname = config.get('notify.name') || config.get('oada.domain');
 
 (async () => {
   info('Starting monitor with cron = %s', cronschedule);
@@ -73,6 +75,8 @@ const timeout = config.get('timeout');
 
   const status = {
     global: {
+      // Report which server this was?
+      server: notifyname,
       status: 'failure',
       lastruntime: 'never',
     },
