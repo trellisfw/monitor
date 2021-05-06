@@ -13,6 +13,8 @@
  * limitations under the License.
  */
 
+import { join } from 'path';
+
 import convict from 'convict';
 import { config as load } from 'dotenv';
 
@@ -75,6 +77,20 @@ const config = convict({
     format: Number,
     // 10 minutes
     default: 10 * 60 * 1000,
+  },
+  tests: {
+    dir: {
+      doc: 'directory of "test modules" to load',
+      format: String,
+      default: join(__dirname, './monitors'),
+      env: 'TESTS_DIR',
+    },
+    enabled: {
+      doc: 'Comma separated list of patterns of test names to run',
+      format: String,
+      default: '*',
+      env: 'TESTS',
+    },
   },
 });
 

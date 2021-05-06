@@ -13,6 +13,9 @@
  * limitations under the License.
  */
 
+import { readdir } from 'fs/promises';
+import { join } from 'path';
+
 import Bluebird from 'bluebird';
 import _ from 'lodash'; // Lazy, lodash isn't really needed anymore;
 import debug from 'debug';
@@ -20,6 +23,7 @@ import express from 'express';
 import uuid from 'uuid';
 import moment from 'moment';
 import cron from 'node-cron';
+import micromatch from 'micromatch';
 
 import { Change, connect } from '@oada/client';
 
@@ -48,7 +52,30 @@ const notifyurl = config.get('notify.url');
 const timeout = config.get('timeout');
 const notifyname = config.get('notify.name') || config.get('oada.domain');
 
-(async () => {
+/**
+ * The format of a test description
+ *
+ * Each test file should export and object of tests
+ */
+export interface Test<P = unknown> {
+  /**
+   * Description of test
+   */
+  desc: string;
+  /**
+   * Tester to use
+   */
+  type: keyof typeof testers;
+  /**
+   * Parameters for tester
+   */
+  params: P;
+}
+
+const testdir = config.get('tests.dir');
+const testmatch = config.get('tests.enabled').split(',');
+
+async function run() {
   info('Starting monitor with cron = %s', cronschedule);
 
   const oada = await connect({
@@ -56,7 +83,7 @@ const notifyname = config.get('notify.name') || config.get('oada.domain');
     token: tokenToRequestAgainstOADA,
     connection: 'http', // no need to keep open websockets
   }).catch((e) => {
-    error('ERROR: failed to connect to OADA.  The error was: %O', e);
+    error('ERROR: failed to connect to OADA. The error was: %O', e);
     throw e;
   });
   trace(
@@ -83,79 +110,47 @@ const notifyname = config.get('notify.name') || config.get('oada.domain');
     tests: {},
   };
 
-  const tests = <const>{
-    'well-known-ssl': {
-      desc: 'Is well-known up with valid SSL?',
-      type: 'pathTest',
-      params: { path: `/.well-known/oada-configuration` },
-    },
+  // Load monitor tests
+  const tests: Record<string, Test> = {};
+  info('Loading all monitor tests from %s', testdir);
+  const testfiles = await readdir(testdir);
+  for (const t of testfiles) {
+    const file = join(testdir, t);
+    // Load tests from file
+    const tf = (await import(file)) as Record<string, Test>;
+    trace('Loaded monitor tests from %s', file);
 
-    'bookmarks': {
-      desc: `Is bookmarks up for token ${tokenToRequestAgainstOADA.slice(
-        0,
-        1
-      )}..${tokenToRequestAgainstOADA.slice(-2)}`,
-      type: 'pathTest',
-      params: { path: `/bookmarks` },
-    },
-
-    'stale-target-jobs': {
-      desc: `Is target job queue devoid of stale (15-min) jobs?`,
-      type: 'staleKsuidKeys',
-      params: {
-        path: `/bookmarks/services/target/jobs`,
-        maxage: 15 * 6, // 15 mins
-      },
-    },
-
-    'staging-clean': {
-      desc: `Does asn-staging have any stale (5-min) ksuid keys?`,
-      type: 'staleKsuidKeys',
-      params: {
-        path: `/bookmarks/trellisfw/asn-staging`,
-        maxage: 5 * 60, // 5 mins
-      },
-    },
-
-    'staging-inactive': {
-      desc: `Is asn-staging's latest rev newer than 12 hours ago?`,
-      type: 'revAge',
-      params: {
-        path: `/bookmarks/trellisfw/asn-staging`,
-        maxage: 12 * 3600, // 12 hours
-      },
-    },
-
-    'count-asns-today': {
-      desc: `Count number of asn's received in today's day-index`,
-      type: 'countKeys',
-      params: {
-        path: `/bookmarks/trellisfw/asns`,
-        index: `day-index`, // tells it to count keys in this known typeof index instead of path
-      },
-    },
-  };
+    // Find any enabled tests
+    const enabled = micromatch(Object.keys(tf), testmatch);
+    trace('Enabling monitor tests %o from %s', enabled, tf);
+    for (const t of enabled) {
+      tests[t] = tf[t];
+    }
+  }
 
   //-------------------------------------------------------
   // Trigger testing on a schedule:
   const check = async () => {
     try {
-      trace(`Running tests`);
+      trace('Running tests');
       const testkeys = _.keys(tests);
       const results = await Bluebird.map(
         testkeys,
-        async (tk) => {
-          trace(`Running test ${tk}`);
+        async (tk: keyof typeof tests) => {
+          trace('Running test %s', tk);
           try {
-            const t = tests[tk as keyof typeof tests];
+            const t = tests[tk];
             const runner = testers[t.type];
             if (!runner) {
               return { status: 'failure', message: 'Invalid tester type' };
             }
-            // @ts-ignore
-            return await runner({ ...t.params, oada });
+            return await runner({
+              //@ts-ignore
+              ...t.params,
+              oada,
+            });
           } catch (e) {
-            info(`Test ${tk} threw uncaught exception: `, e);
+            error('Test %s threw uncaught exception: %O', tk, e);
             return {
               status: 'failure',
               message: `Uncaught exception: ${e.toString()}`,
@@ -165,13 +160,13 @@ const notifyname = config.get('notify.name') || config.get('oada.domain');
         { concurrency: 1 }
       );
 
-      trace('Results of tests: ', results);
+      trace('Results of tests: %O', results);
       status.tests = _.zipObject(testkeys, results);
       const failures = _.filter(
         results,
         (r) => !r.status || r.status !== 'success'
       );
-      trace(`Results filtered to failures = `, failures);
+      trace('Results filtered to failures = %O', failures);
       status.global.status = failures.length < 1 ? 'success' : 'failure';
       status.global.lastruntime = moment().format('YYYY-MM-DD HH:mm:ss');
 
@@ -180,32 +175,28 @@ const notifyname = config.get('notify.name') || config.get('oada.domain');
         return;
       }
 
-      info(
-        `Failure: sending notification.  Failure status is: `,
-        JSON.stringify(status, null, '  ')
-      );
+      info('Failure: sending notification.  Failure status is: %O', status);
       if (notifyurl) {
         trace("Posting message to config.get('notify.url') = %s", notifyurl);
         try {
           notifiers.notifySlack(notifyurl, status);
         } catch (e) {
-          error(`FAILED TO NOTIFY SLACK!  Error was: ${e.toString()}`);
+          error('FAILED TO NOTIFY SLACK! Error was: %s', e);
         }
       }
     } catch (e) {
-      error(
-        `check: Uncaught error from main check.  Error was: ${e.toString()}`
-      );
+      error('check: Uncaught error from main check. Error was: %s', e);
     }
   };
   // Run the check immediately on start, then schedule the intervals
-  info(`Running initial check`);
+  info('Running initial check');
   await check();
   info(
-    `Completed initial check, starting re-check on cron string ${cronschedule}`
+    'Completed initial check, starting re-check on cron string %s',
+    cronschedule
   );
   cron.schedule(cronschedule, check);
-  info(`Started monitor`);
+  info('Started monitor');
 
   //------------------------------------------------------------------------------
   //
@@ -227,7 +218,8 @@ const notifyname = config.get('notify.name') || config.get('oada.domain');
     }
 
     info(
-      `Responding to request with current global status ${status.global.status}`
+      'Responding to request with current global status %O',
+      status.global.status
     );
     res.json(status);
 
@@ -244,10 +236,11 @@ const notifyname = config.get('notify.name') || config.get('oada.domain');
       return res.end();
     }
 
-    info(`trigger: triggering extra run of check() based on request`);
+    info('trigger: triggering extra run of check() based on request');
     await check();
     info(
-      `trigger: Responding to request with current global status ${status.global.status}`
+      'trigger: Responding to request with current global status %O',
+      status.global.status
     );
     res.json(status);
 
@@ -256,7 +249,9 @@ const notifyname = config.get('notify.name') || config.get('oada.domain');
 
   // proxy routes https://<domain>/trellis-monitor to us on 80
   app.listen(port, () => info('@trellisfw/monitor listening on port %d', port));
-})();
+}
+
+run();
 
 async function postOne() {
   let newkey = false;

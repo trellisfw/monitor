@@ -12,6 +12,8 @@ services:
       NODE_ENV: ${NODE_ENV:-development}
       DEBUG: ${DEBUG:-*info*,*warn*,*error*}
       notifyurl:
+      TESTS_DIR:
+      TESTS: ${TESTS:-*}
       # Connect to host if DOMAIN not set.
       # You should really not rely on this though. Set DOMAIN.
       DOMAIN: ${DOMAIN:-host.docker.internal}
