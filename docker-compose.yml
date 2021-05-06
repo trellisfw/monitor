@@ -1,21 +1,20 @@
-version: '3.9'
-
 services:
   trellis-monitor:
     build:
       context: .
-    container_name: trellis-monitor
-    ports:
-      - 80
+    image: trellisfw/monitor
+    expose:
+      - 8080
     restart: unless-stopped
-    volumes:
-      - .:/code/trellis-monitor
     environment:
-      - NODE_TLS_REJECT_UNAUTHORIZED
-      - NODE_ENV=${NODE_ENV:-development}
-      - DEBUG=${DEBUG:-*info*,*warn*,*error*}
-      - notifyurl
-      - domain
-      - tokenToRequestAgainstOADA
-      - incomingToken
-      - cron
+      PORT: 8080
+      NODE_TLS_REJECT_UNAUTHORIZED:
+      NODE_ENV: ${NODE_ENV:-development}
+      DEBUG: ${DEBUG:-*info*,*warn*,*error*}
+      notifyurl:
+      # Connect to host if DOMAIN not set.
+      # You should really not rely on this though. Set DOMAIN.
+      DOMAIN: ${DOMAIN:-host.docker.internal}
+      TOKEN:
+      incomingToken:
+      CRON:

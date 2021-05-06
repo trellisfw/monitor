@@ -1,11 +1,28 @@
-const _ = require('lodash');
-const ksuid = require('ksuid');
-const moment = require('moment');
-const debug = require('debug');
+/* Copyright 2021 Qlever LLC
+ *
+ * Licensed under the Apache License, Version 2.0 (the 'License');
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an 'AS IS' BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
+import _ from 'lodash';
+import ksuid from 'ksuid';
+import moment from 'moment';
+import debug from 'debug';
+
+import type { Change, OADAClient } from '@oada/client';
 
 const trace = debug('trellis-monitor:trace');
 
-const pathTest = async ({ path, oada }) => {
+const pathTest = async ({ path, oada }: { path: string; oada: OADAClient }) => {
   try {
     trace(`pathTest: GET ${path}`);
     await oada.get({ path });
@@ -19,15 +36,23 @@ const pathTest = async ({ path, oada }) => {
   }
 };
 
-const revAge = async ({ path, maxage, oada }) => {
+const revAge = async ({
+  path,
+  maxage,
+  oada,
+}: {
+  path: string;
+  oada: OADAClient;
+  maxage: number;
+}) => {
   try {
     trace(`revAge: testing rev at ${path} against maxage ${maxage}`);
     const lastrev = await oada
       .get({ path: `${path}/_rev` })
       .then((r) => r.data);
-    const changes = await oada
+    const changes = ((await oada
       .get({ path: `${path}/_meta/_changes/${lastrev}` })
-      .then((r) => r.data);
+      .then((r) => r.data)) as unknown) as Change[];
     // Get the change to ""  (i.e. this node)
     const change = _.find(changes, (c) => c.path === '');
     const modified = moment(_.get(change, `body._meta.modified`, 0) * 1000);
@@ -58,7 +83,15 @@ const revAge = async ({ path, maxage, oada }) => {
   }
 };
 
-const staleKsuidKeys = async ({ path, maxage, oada }) => {
+const staleKsuidKeys = async ({
+  path,
+  maxage,
+  oada,
+}: {
+  path: string;
+  maxage: number;
+  oada: OADAClient;
+}) => {
   try {
     trace(`staleKsuidKeys: testing ${path} against maxage ${maxage}`);
     const list = await oada.get({ path }).then((r) => r.data);
@@ -98,7 +131,15 @@ const staleKsuidKeys = async ({ path, maxage, oada }) => {
   }
 };
 
-const countKeys = async ({ path, index = null, oada }) => {
+const countKeys = async ({
+  path,
+  index = '',
+  oada,
+}: {
+  path: string;
+  index: string;
+  oada: OADAClient;
+}) => {
   try {
     if (index) {
       switch (index) {
@@ -132,9 +173,18 @@ const countKeys = async ({ path, index = null, oada }) => {
   }
 };
 
-function strError(e) {
-  if (!e) return JSON.stringify(e);
-  if (e.message) return e.message;
+function strError(e: {
+  message?: string;
+  status: number;
+  url: string;
+  statusText: string;
+}) {
+  if (!e) {
+    return JSON.stringify(e);
+  }
+  if (e.message) {
+    return e.message;
+  }
   // The http response objects do not have the things you want to know as enumerable properties:
   if (e.status) {
     return `{ url: ${e.url}, status: ${e.status}, statusText: ${e.statusText} }`;
@@ -142,9 +192,4 @@ function strError(e) {
   return JSON.stringify(e, null, '  ');
 }
 
-module.exports = {
-  pathTest,
-  revAge,
-  staleKsuidKeys,
-  countKeys,
-};
+export { pathTest, revAge, staleKsuidKeys, countKeys };

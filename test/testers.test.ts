@@ -1,16 +1,31 @@
-const { expect } = require('chai');
-const { connect } = require('@oada/client');
-const ksuid = require('ksuid');
-const config = require('../config');
-const Promise = require('bluebird');
-const moment = require('moment');
-const { pathTest, revAge, staleKsuidKeys, countKeys } = require('../testers');
+/* Copyright 2021 Qlever LLC
+ *
+ * Licensed under the Apache License, Version 2.0 (the 'License');
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an 'AS IS' BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
 
-const domain = config.get('domain');
-const token = config.get('tokenToRequestAgainstOADA');
+import { expect } from 'chai';
+import { connect, OADAClient } from '@oada/client';
+import ksuid from 'ksuid';
+import config from '../src/config';
+import Bluebird from 'bluebird';
+import moment from 'moment';
+import { pathTest, revAge, staleKsuidKeys, countKeys } from '../src/testers';
+
+const domain = config.get('oada.domain');
+const token = config.get('oada.token');
 
 describe('testers', () => {
-  let oada = false;
+  let oada: OADAClient;
   before(async () => {
     oada = await connect({ domain, token, connection: 'http' });
   });
@@ -42,8 +57,8 @@ describe('testers', () => {
     const path = '/resources/TRELLIS-MONITOR-TEST-' + ksuid.randomSync().string;
 
     before(async () => {
-      await oada.put({ path, data: {}, _type: 'application/json' });
-      await Promise.delay(1001); // wait 1 s should be sufficient to test age
+      await oada.put({ path, data: {}, contentType: 'application/json' });
+      await Bluebird.delay(1001); // wait 1 s should be sufficient to test age
     });
 
     after(async () => {
@@ -66,8 +81,8 @@ describe('testers', () => {
     const newksuid = ksuid.randomSync().string;
     const oldksuid = ksuid.randomSync(new Date('2021-02-03T01:00:00Z')).string;
     before(async () => {
-      await oada.put({ path, data: {}, _type: 'application/json' });
-      await Promise.delay(1001); // wait 1 s should be sufficient to test age
+      await oada.put({ path, data: {}, contentType: 'application/json' });
+      await Bluebird.delay(1001); // wait 1 s should be sufficient to test age
     });
 
     after(async () => oada.delete({ path }));
@@ -76,7 +91,7 @@ describe('testers', () => {
       await oada.put({
         path,
         data: { [newksuid]: true },
-        _type: 'application/json',
+        contentType: 'application/json',
       });
       const result = await staleKsuidKeys({ path, maxage: 60, oada });
       await oada.delete({ path: `${path}/newksuid` });
@@ -87,7 +102,7 @@ describe('testers', () => {
       await oada.put({
         path,
         data: { [oldksuid]: true },
-        _type: 'application/json',
+        contentType: 'application/json',
       });
       const result = await staleKsuidKeys({ path, maxage: 1, oada });
       await oada.delete({ path: `${path}/oldksuid` });
@@ -105,7 +120,7 @@ describe('testers', () => {
       await oada.put({
         path: `/${indexid}`,
         data: { key1: 'val1', key2: 'val2' },
-        _type: 'application/json',
+        contentType: 'application/json',
       });
       await oada.put({
         path: `/${parentid}`,
@@ -114,7 +129,7 @@ describe('testers', () => {
             [moment().format('YYYY-MM-DD')]: { _id: indexid, _rev: 0 },
           },
         },
-        _type: 'application/json',
+        contentType: 'application/json',
       });
     });
     after(async () => {

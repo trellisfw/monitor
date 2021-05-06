@@ -1,5 +1,3 @@
-version: '3.9'
-
 services:
   permissions-handler:
     volumes:
@@ -16,5 +14,3 @@ services:
       service: trellis-monitor
     build:
       context: ./services/trellis-monitor
-    volumes:
-      - ./services/trellis-monitor:/code/trellis-monitor

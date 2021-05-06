@@ -1,21 +1,36 @@
-const { expect } = require('chai');
-const { connect } = require('@oada/client');
-const ksuid = require('ksuid');
-const { pathTest, revAge, staleKsuidKeys } = require('../testers');
-const Promise = require('bluebird');
-const tiny = require('tiny-json-http');
-const _ = require('lodash');
-const debug = require('debug');
+/* Copyright 2021 Qlever LLC
+ *
+ * Licensed under the Apache License, Version 2.0 (the 'License');
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an 'AS IS' BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
 
-const config = require('../config');
-const interval = config.get('interval');
+import { expect } from 'chai';
+import ksuid from 'ksuid';
+import Bluebird from 'bluebird';
+import tiny from 'tiny-json-http';
+import _ from 'lodash';
+import debug from 'debug';
+
+import { connect, OADAClient } from '@oada/client';
+
+import config from '../src/config';
 
 const trace = debug('trellis-monitor:trace');
 
-const domain = config.get('domain');
-const token = config.get('tokenToRequestAgainstOADA');
-const incomingToken = config.get('incomingToken');
-trace(`Connecting to oada w/ domain = ${domain} and token = ${token}`);
+const domain = config.get('oada.domain');
+const token = config.get('oada.token');
+const incomingToken = config.get('server.token');
+
+trace('Connecting to oada w/ domain = %s and token = %s', domain, token);
 
 const tree = {
   bookmarks: {
@@ -45,7 +60,7 @@ const tree = {
 // mocha in this case: it will wait to run our tests until we call "run".  Code for that is at bottom.
 
 describe('service', () => {
-  let oada = false;
+  let oada: OADAClient;
   before(async () => {
     oada = await connect({ domain, token, connection: 'http' });
     // Setup the trees that it is expecting to be there
@@ -59,9 +74,9 @@ describe('service', () => {
     await oada.put({
       path: `/bookmarks/trellisfw/asn-staging`,
       data: { [oldksuid]: { istest: true } },
-      _type: 'application/json',
+      contentType: 'application/json',
     });
-    const url = `http://localhost:${config.get('port')}/trigger`;
+    const url = `http://localhost:${config.get('server.port')}/trigger`;
     trace('Getting trigger at url ', url);
     const res = await tiny.get({
       url,
@@ -77,13 +92,13 @@ if (run) {
   console.log(
     '--delay passed, waiting 2 seconds before starting service tests'
   );
-  Promise.delay(2000).then(() => {
+  Bluebird.delay(2000).then(() => {
     console.log('Done waiting, starting service tests');
     run();
   });
 }
 
-async function ensurePath(path, oada) {
+async function ensurePath(path: string, oada: OADAClient) {
   await oada.head({ path }).catch(async (e) => {
     if (e.status === 404) {
       console.log(

@@ -1,46 +1,70 @@
-const Promise = require('bluebird');
-const _ = require('lodash'); // Lazy, lodash isn't really needed anymore);
-const debug = require('debug');
-const express = require('express');
-const { connect } = require('@oada/client');
-const uuid = require('uuid');
-const moment = require('moment');
-const cron = require('node-cron');
+/* Copyright 2021 Qlever LLC
+ *
+ * Licensed under the Apache License, Version 2.0 (the 'License');
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an 'AS IS' BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
 
-const testers = require('./testers');
-const notifiers = require('./notifiers');
+import Bluebird from 'bluebird';
+import _ from 'lodash'; // Lazy, lodash isn't really needed anymore;
+import debug from 'debug';
+import express from 'express';
+import uuid from 'uuid';
+import moment from 'moment';
+import cron from 'node-cron';
 
-const config = require('./config.js');
-const testasn = require('./testasn.js');
+import { Change, connect } from '@oada/client';
+
+import * as testers from './testers';
+import * as notifiers from './notifiers';
+
+import testasn from './testasn';
+
+import config from './config';
+
+const error = debug('trellis-monitor:error');
+const info = debug('trellis-monitor:info');
+const warn = debug('trellis-monitor:warn');
+const trace = debug('trellis-monitor:trace');
+
+const incomingToken = config.get('server.token');
+const port = config.get('server.port');
+const tokenToRequestAgainstOADA = config.get('oada.token');
+let domain = config.get('oada.domain');
+if (!domain.match(/^http/)) {
+  domain = 'https://' + domain;
+}
+const cronschedule = config.get('notify.cron');
+const notifyurl = config.get('notify.url');
+const timeout = config.get('timeout');
 
 (async () => {
-  const error = debug('trellis-monitor:error');
-  const info = debug('trellis-monitor:info');
-  //const warn = debug("trellis-monitor:warn");
-  const trace = debug('trellis-monitor:trace');
-
-  const incomingToken = config.get('incomingToken');
-  const tokenToRequestAgainstOADA = config.get('tokenToRequestAgainstOADA');
-  let domain = config.get('domain');
-  if (!domain.match(/^http/)) domain = 'https://' + domain;
-  const cronschedule = config.get('cron') || '* */15 * * * *';
-  const notifyurl = config.get('notifyurl') || false;
-
-  info('Starting monitor with cron = ', cronschedule);
+  info('Starting monitor with cron = %s', cronschedule);
 
   const oada = await connect({
     domain,
     token: tokenToRequestAgainstOADA,
     connection: 'http', // no need to keep open websockets
   }).catch((e) => {
-    error('ERROR: failed to connect to OADA.  The error was: ', e);
+    error('ERROR: failed to connect to OADA.  The error was: %O', e);
+    throw e;
   });
   trace(
-    `Connected to oada, domain = ${domain}, token = ${tokenToRequestAgainstOADA}`
+    'Connected to oada, domain = %s, token = %s',
+    domain,
+    tokenToRequestAgainstOADA
   );
 
   // Is well-known up w/ SSL?
-  // Is bookmarks up w/ Boomi token?
+  // Is bookmarks up w/ test token?
   // Any jobs in Target queue w/ update longer than 30 mins ago?
   // asn-staging: if last _rev is more than 5 mins old, and we still have keys in asn-staging, error
   // asn-staging: if last _rev more than 12 hours old, error
@@ -50,11 +74,12 @@ const testasn = require('./testasn.js');
   const status = {
     global: {
       status: 'failure',
+      lastruntime: 'never',
     },
     tests: {},
   };
 
-  let tests = {
+  const tests = <const>{
     'well-known-ssl': {
       desc: 'Is well-known up with valid SSL?',
       type: 'pathTest',
@@ -113,15 +138,17 @@ const testasn = require('./testasn.js');
     try {
       trace(`Running tests`);
       const testkeys = _.keys(tests);
-      const results = await Promise.map(
+      const results = await Bluebird.map(
         testkeys,
         async (tk) => {
           trace(`Running test ${tk}`);
           try {
-            const t = tests[tk];
+            const t = tests[tk as keyof typeof tests];
             const runner = testers[t.type];
-            if (!runner)
+            if (!runner) {
               return { status: 'failure', message: 'Invalid tester type' };
+            }
+            // @ts-ignore
             return await runner({ ...t.params, oada });
           } catch (e) {
             info(`Test ${tk} threw uncaught exception: `, e);
@@ -154,7 +181,7 @@ const testasn = require('./testasn.js');
         JSON.stringify(status, null, '  ')
       );
       if (notifyurl) {
-        trace(`Posting message to config.get('notifyurl') = ${notifyurl}`);
+        trace("Posting message to config.get('notify.url') = %s", notifyurl);
         try {
           notifiers.notifySlack(notifyurl, status);
         } catch (e) {
@@ -224,16 +251,15 @@ const testasn = require('./testasn.js');
   });
 
   // proxy routes https://<domain>/trellis-monitor to us on 80
-  app.listen(config.get('port'), () =>
-    console.log(`trellis-monitor listening on port ${config.get('port')}`)
-  );
+  app.listen(port, () => info('@trellisfw/monitor listening on port %d', port));
 })();
 
 async function postOne() {
   let newkey = false;
-  const con = await oada.connect({
+  const con = await connect({
     domain,
     token: tokenToRequestAgainstOADA,
+    // @ts-ignore
     cache: false,
   });
   try {
@@ -257,37 +283,33 @@ async function postOne() {
     await con
       .put({
         path: `/bookmarks/trellisfw/asn-staging/${newkey}`,
-        data: testasn,
-        headers: {
-          'content-type': 'application/vnd.trellisfw.asn-staging.sf.1+json',
-        },
+        data: testasn as any,
+        contentType: 'application/vnd.trellisfw.asn-staging.sf.1+json',
       })
       .then((r) => r.headers['content-location'].slice(1))
       .catch((e) => {
         error('FAILED to post ASN to asn-staging!  error was: ', e);
         throw new Error(
           'FAILED to post ASN to asn-staging!  error was: ' +
-            JSON.stringify(e, false, '  ')
+            JSON.stringify(e, null, '  ')
         );
       });
     info('Document posted to asn-staging as new key', newkey);
 
-    const p = new Promise(async (resolve, reject) => {
+    const p = new Bluebird(async (resolve, reject) => {
       try {
         // Set a timer to timeout when waiting
         setTimeout(() => {
           if (!p.isFulfilled()) {
             error(
-              'TIMEOUT: took longer than ' +
-                timeout +
-                'ms to fulfill, returning error!'
+              'TIMEOUT: took longer than %d ms to fulfill, returning error!',
+              timeout
             );
             reject('TIMEOUT: took longer than ' + timeout + 'ms to fulfill');
           }
         }, timeout);
         // Create watch handler
-        function watchHandler(payload) {
-          const change = payload && payload.response && payload.response.change;
+        function watchHandler(change: Readonly<Change>) {
           if (!change || change.type !== 'merge') {
             trace(
               'received change, but was not a merge.  change was: ',
@@ -295,6 +317,7 @@ async function postOne() {
             );
             return;
           }
+          // @ts-ignore
           if (!change.body[newkey]) {
             trace(
               'received change, but was not to the new key.  change was: ',
@@ -305,6 +328,7 @@ async function postOne() {
           trace(
             `Received change on ${newkey}, will check if it is meta as "asset created"`
           );
+          // @ts-ignore
           const meta = change.body[newkey]._meta;
           trace('change meta = ', meta);
           if (!meta) {
@@ -324,6 +348,7 @@ async function postOne() {
           if (str.match(/asset[ _-]+created/i)) {
             trace('received change, asset is created, resolving promise');
             trace('successful change was: ', change);
+            // @ts-ignore
             return resolve(change.body[newkey]._rev);
           }
           trace('received change, but nothing matches "asset created"');
@@ -331,22 +356,22 @@ async function postOne() {
         // Set a watch on asn's, look for this key to show up
         await con.get({
           path: '/bookmarks/trellisfw/asns',
-          watch: { callback: watchHandler },
+          watchCallback: watchHandler,
         });
       } catch (e) {
         error('FAILED waiting for success, never saw it');
-        res.json({ error: true, message: JSON.stringify(e, false, '  ') });
+        //res.json({ error: true, message: JSON.stringify(e, null, '  ') });
         throw e;
       }
     });
-    const success_rev = await p;
+    //const success_rev = await p;
     info('Overall test successful on key ', newkey);
-    currentlysuccess = true;
-    latestmessage = `ASN push to IFT succeeded on id ${newkey} on rev ${success_rev}`;
+    //currentlysuccess = true;
+    //latestmessage = `ASN push to IFT succeeded on id ${newkey} on rev ${success_rev}`;
   } catch (e) {
     error('FAILED waiting for success, never saw it');
-    currentlysuccess = false;
-    latestmessage = JSON.stringify(e, false, '  ');
+    //currentlysuccess = false;
+    //latestmessage = JSON.stringify(e, false, '  ');
   } finally {
     // Delete the asn-staging entry, the asns entry, and the resource itself
     if (newkey) {
@@ -378,4 +403,4 @@ async function postOne() {
   }
 }
 
-module.exports = { postOne };
+export { postOne };
