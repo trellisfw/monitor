@@ -123,7 +123,7 @@ jobs:
         # TODO: Clean up this monstrosity... one day...
         run: |
           # Nameo on DockerHub (Doesn't like upper case)
-          DOCKER_IMAGE=$(echo ${{ github.repository }} | tr '[:upper:]' '[:lower:]')
+          DOCKER_IMAGE=$(echo ${{ matrix.service }} | tr '[:upper:]' '[:lower:]')
           # Name on GHCR
           GHCR_IMAGE=ghcr.io/${DOCKER_IMAGE}
 
