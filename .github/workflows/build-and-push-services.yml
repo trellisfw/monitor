@@ -4,6 +4,11 @@ on:
   push:
   pull_request:
 
+env:
+  # Set to true to push images to DockerHub
+  # NB: images are public unless you configure DockerHub repo properly
+  DOCKERHUB_PUSH: true
+
 jobs:
   setup:
     runs-on: ubuntu-latest
@@ -76,7 +81,8 @@ jobs:
       matrix:
         service:
           # Assume repo slug is the service slug?
-          - ${{ github.repository }}
+          #- ${{ github.repository }}
+          - trellisfw/monitor
         context:
           - '.'
 
@@ -107,32 +113,44 @@ jobs:
         id: cache
         with:
           path: /tmp/.buildx-cache
-          #key: ${{ runner.os }}-buildx-${{ matrix.service }}-${{ github.sha }}
-          # Don't separate cache by service etc.
-          key: ${{ runner.os }}-buildx
+          key: ${{ runner.os }}-buildx-${{ github.sha }}-${{ matrix.service }}
           restore-keys: |
-            ${{ runner.os }}-buildx-${{ matrix.service }}
+            ${{ runner.os }}-buildx-${{ github.sha }}-
             ${{ runner.os }}-buildx-
 
       - name: Prepare Tags
         id: prepare
+        # TODO: Clean up this monstrosity... one day...
         run: |
-          DOCKER_IMAGE=${{ matrix.service }}
+          # Nameo on DockerHub (Doesn't like upper case)
+          DOCKER_IMAGE=$(echo ${{ github.repository }} | tr '[:upper:]' '[:lower:]')
+          # Name on GHCR
+          GHCR_IMAGE=ghcr.io/${DOCKER_IMAGE}
 
-          TAGS="${DOCKER_IMAGE}:${{ needs.setup.outputs.version }}"
+          TAGS="${GHCR_IMAGE}:${{ needs.setup.outputs.version }}"
+          DH_TAGS="${DOCKER_IMAGE}:${{ needs.setup.outputs.version }}"
           if [[ "${{ needs.setup.outputs.release }}" ]]; then
             if [[ "${{ needs.setup.outputs.prerelease }}" ]]; then
-              TAGS="${DOCKER_IMAGE}:${{ needs.setup.outputs.major }}.${{ needs.setup.outputs.major }}.${{ needs.setup.outputs.patch }}-${{ needs.setup.outputs.prerelease }}"
+              TAGS="${GHCR_IMAGE}:${{ needs.setup.outputs.major }}.${{ needs.setup.outputs.minor }}.${{ needs.setup.outputs.patch }}-${{ needs.setup.outputs.prerelease }}"
+              DH_TAGS="${DOCKER_IMAGE}:${{ needs.setup.outputs.major }}.${{ needs.setup.outputs.minor }}.${{ needs.setup.outputs.patch }}-${{ needs.setup.outputs.prerelease }}"
               # TODO: Keep old prerelease builds?
             else
-              TAGS="$TAGS,${DOCKER_IMAGE}:latest"
-              TAGS="$TAGS,${DOCKER_IMAGE}:${{ needs.setup.outputs.major }}"
-              TAGS="$TAGS,${DOCKER_IMAGE}:${{ needs.setup.outputs.major }}.${{ needs.setup.outputs.major }}"
+              TAGS="$TAGS,${GHCR_IMAGE}:latest"
+              TAGS="$TAGS,${GHCR_IMAGE}:${{ needs.setup.outputs.major }}"
+              TAGS="$TAGS,${GHCR_IMAGE}:${{ needs.setup.outputs.major }}.${{ needs.setup.outputs.minor }}"
+              DH_TAGS="$DH_TAGS,${DOCKER_IMAGE}:latest"
+              DH_TAGS="$DH_TAGS,${DOCKER_IMAGE}:${{ needs.setup.outputs.major }}"
+              DH_TAGS="$DH_TAGS,${DOCKER_IMAGE}:${{ needs.setup.outputs.major }}.${{ needs.setup.outputs.minor }}"
             fi
           fi
 
           if [ "${{ github.event_name }}" = "push" ]; then
-            TAGS="$TAGS,${DOCKER_IMAGE}:sha-${GITHUB_SHA::8}"
+            TAGS="$TAGS,${GHCR_IMAGE}:sha-${GITHUB_SHA::8}"
+            DH_TAGS="$DH_TAGS,${DOCKER_IMAGE}:sha-${GITHUB_SHA::8}"
+          fi
+
+          if [[ "${{ env.DOCKERHUB_PUSH }}" ]]; then
+            TAGS="$TAGS,${DH_TAGS}"
           fi
 
           echo ::set-output name=tags::${TAGS}
@@ -141,13 +159,21 @@ jobs:
           echo ${{ github.event.repository.license }}
 
       - name: Login to DockerHub
-        if: github.event_name != 'pull_request'
+        if: ${{ env.DOCKERHUB_PUSH && github.event_name != 'pull_request' }}
         uses: docker/login-action@v1.9.0
         with:
           username: ${{ secrets.DOCKERHUB_USERNAME }}
           password: ${{ secrets.DOCKERHUB_TOKEN }}
 
-      - name: Build and push
+      - name: Login to GitHub Container Registry
+        if: github.event_name != 'pull_request'
+        uses: docker/login-action@v1.9.0
+        with:
+          registry: ghcr.io
+          username: ${{ github.repository_owner }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Build and push images
         uses: docker/build-push-action@v2.4.0
         with:
           context: ${{ matrix.context }}
@@ -159,6 +185,7 @@ jobs:
             VERSION=${{ steps.prepare.outputs.version }}
             BUILD_DATE=${{ steps.prepare.outputs.created }}
             GIT_REF=${{ github.sha }}
+            SERVICE=${{ matrix.service }}
           labels: |
             org.opencontainers.image.title=${{ matrix.service }}
             org.opencontainers.image.url=${{ github.event.repository.html_url }}

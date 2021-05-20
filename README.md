@@ -1,7 +1,7 @@
+# trellisfw/monitor
+
 [![License](https://img.shields.io/github/license/trellisfw/trellis-monitor)](LICENSE)
 [![Docker Pulls](https://img.shields.io/docker/pulls/trellisfw/monitor)][dockerhub]
-
-# trellisfw/monitor
 
 ## Usage
 

@@ -124,7 +124,7 @@ async function run() {
     const enabled = micromatch(Object.keys(tf), testmatch);
     trace('Enabling monitor tests %o from %s', enabled, tf);
     for (const t of enabled) {
-      tests[t] = tf[t];
+      tests[t] = tf[t]!;
     }
   }
 
@@ -139,15 +139,15 @@ async function run() {
         async (tk: keyof typeof tests) => {
           trace('Running test %s', tk);
           try {
-            const t = tests[tk];
+            const t = tests[tk]!;
             const runner = testers[t.type];
             if (!runner) {
               return { status: 'failure', message: 'Invalid tester type' };
             }
             return await runner({
+              oada,
               //@ts-ignore
               ...t.params,
-              oada,
             });
           } catch (e) {
             error('Test %s threw uncaught exception: %O', tk, e);
@@ -285,7 +285,7 @@ async function postOne() {
         data: testasn as any,
         contentType: 'application/vnd.trellisfw.asn-staging.sf.1+json',
       })
-      .then((r) => r.headers['content-location'].slice(1))
+      .then((r) => r.headers['content-location']?.slice(1))
       .catch((e) => {
         error('FAILED to post ASN to asn-staging!  error was: ', e);
         throw new Error(
