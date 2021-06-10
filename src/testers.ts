@@ -50,9 +50,9 @@ const revAge = async ({
     const lastrev = await oada
       .get({ path: `${path}/_rev` })
       .then((r) => r.data);
-    const changes = ((await oada
+    const changes = (await oada
       .get({ path: `${path}/_meta/_changes/${lastrev}` })
-      .then((r) => r.data)) as unknown) as Change[];
+      .then((r) => r.data)) as unknown as Change[];
     // Get the change to ""  (i.e. this node)
     const change = _.find(changes, (c) => c.path === '');
     const modified = moment(_.get(change, `body._meta.modified`, 0) * 1000);
