@@ -15,7 +15,25 @@ There are a set of default tests in monitors/default.  You can add additional fi
 to `dist/monitors` and they will be included in the tests run on the cron schedule.
 There are example configs in `examples/`.
 
-Example set of monitors:
+If any test fails, alerts are sent to the environment-specified `notifyurl`.  The output
+is a JSON object containing the status of every test that was run during this interval.
+
+You can also poll the monitor for it's latest results at port 8080 of the service, or if included
+in an oada deployment at `<domain>/trellis-monitor`.  You can trigger a run of the tests
+at `/trellis-monitor/trigger`.
+
+## Important Configuration
+
+The token required to retrieve the current monitor status from outside is passed
+as an environment variable:
+```bash
+incomingToken="02ioj3flkfs" yarn run start
+```
+(see additional usage below for local docker or oada deployment)
+
+Also, because of nuances w/ modules, you cannot have a test named "default".
+
+## Example set of monitor:
 ```javascript
 module.exports = {
   stale_email_jobs: {
@@ -67,15 +85,6 @@ module.exports = {
 };
 ```
 
-## Important Configuration
-
-The token required to retrieve the current monitor status from outside is passed
-as an environment variable:
-```bash
-incomingToken="02ioj3flkfs" yarn run start
-```
-(see additional usage below for local docker or oada deployment)
-
 
 ## Usage
 
@@ -108,17 +117,16 @@ or docker-compose.override.yml manually.
 - ./support/target-prod.js:/trellisfw/monitor/dist/monitors/target-prod.js
 ### docker-compose
 
-Here is an example of using this service with docker-compose.
+## Configuration
 
+Map in additional monitor spec files as `.js` or `.json` to `dist/monitors` if running locally.
+Map them to `/trellisfw/monitor/dist/monitors` if running in docker or in an oada deployment.
+
+Available environment variables:
 ```yaml
-services:
-  service:
-    image: trellisfw/monitor
-    restart: unless-stopped
-    expose:
-      - 8080
-    restart: unless-stopped
-    environment:
+      # NAME: override oada.domain as the name we report for ourselves in alerts.
+      # TESTS: comma-separated list of patterns of test names to run (non-matches excluded)
+      # TESTS_DIR: override location of monitor spec files to load
       PORT: 8080
       NODE_TLS_REJECT_UNAUTHORIZED:
       NODE_ENV: ${NODE_ENV:-development}
@@ -137,25 +145,5 @@ services:
       TOKEN: ${TOKEN:-abc123}
 ```
 
-### Running trellisfw/monitor within the [OADA Reference API Server]
-
-To add this service to the services run with an OADA v3 server,
-simply add a snippet like the one in the previous section
-to your `docker-compose.override.yml`.
-
-### External Usage
-
-To run this service separately, simply set the domain and token(s) of the OADA API.
-
-```shell
-# Set up the environment.
-# Only need to run these the first time.
-echo DOMAIN=api.oada.example.com > .env # Set API domain
-echo TOKEN=abc123 >> .env # Set API token(s) for the service
-
-# Start the service
-docker-compose up -d
-```
-
 [dockerhub]: https://hub.docker.com/repository/docker/trellisfw/monitor
-[oada reference api server]: https://github.com/OADA/oada-srvc-docker
+[oada reference api server]: https://github.com/OADA/server
