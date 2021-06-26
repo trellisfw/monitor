@@ -4,6 +4,8 @@
 [![Docker Pulls](https://img.shields.io/docker/pulls/trellisfw/monitor)][dockerhub]
 
 This service can monitor an OADA/Trellis installation on a schedule and alert if something fails.
+The schedule looks like a regular cron-style string: `*/15 * * * *` means "every 15 minutes".
+`minute hour day_of_month month day_of_week`
 
 There are a set of available "tests" you can run:
 - *maxAge*: alert if a given resource is older than maxage
