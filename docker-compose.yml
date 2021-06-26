@@ -1,14 +1,13 @@
 services:
   trellis-monitor:
-    build:
+    build: 
       context: .
-    image: trellisfw/monitor
     expose:
       - 8080
     restart: unless-stopped
     environment:
       PORT: 8080
-      NODE_TLS_REJECT_UNAUTHORIZED:
+      NODE_TLS_REJECT_UNAUTHORIZED: ${NODE_TLS_REJECT_UNAUTHORIZED:-1}
       NODE_ENV: ${NODE_ENV:-development}
       DEBUG: ${DEBUG:-*info*,*warn*,*error*}
       notifyurl:

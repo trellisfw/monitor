@@ -1,5 +1,5 @@
 services:
-  permissions-handler:
+  http-handler:
     volumes:
       - ./services/trellis-monitor/support/scopes.js:/code/scopes/additional-scopes/monitor_scopes.js
 
@@ -8,9 +8,24 @@ services:
     volumes:
       - ./services/trellis-monitor/support/trellis-monitor.subfolder.conf:/config/nginx/proxy-confs/trellis-monitor.subfolder.conf
 
+  # This is a straight copy-paste from docker-compose.yml used for local deployment
+  # but with "build" removed and replaced w/ image
   trellis-monitor:
-    extends:
-      file: ./services/trellis-monitor/docker-compose.yml
-      service: trellis-monitor
-    build:
-      context: ./services/trellis-monitor
+    image: trellisfw/monitor
+    expose:
+      - 8080
+    restart: unless-stopped
+    environment:
+      PORT: 8080
+      NODE_TLS_REJECT_UNAUTHORIZED: ${NODE_TLS_REJECT_UNAUTHORIZED:-1}
+      NODE_ENV: ${NODE_ENV:-development}
+      DEBUG: ${DEBUG:-*info*,*warn*,*error*}
+      notifyurl:
+      TESTS_DIR:
+      TESTS: ${TESTS:-*}
+      # Connect to host if DOMAIN not set.
+      # You should really not rely on this though. Set DOMAIN.
+      DOMAIN: ${DOMAIN:-host.docker.internal}
+      TOKEN:
+      incomingToken:
+      CRON:
