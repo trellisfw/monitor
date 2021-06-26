@@ -19,16 +19,19 @@ import ksuid from 'ksuid';
 import config from '../src/config';
 import Bluebird from 'bluebird';
 import moment from 'moment';
-import { pathTest, revAge, staleKsuidKeys, countKeys } from '../src/testers';
+import { pathTest, maxAge, relativeAge, staleKsuidKeys, countKeys } from '../src/testers';
 
 const domain = config.get('oada.domain');
 const token = config.get('oada.token');
 
 describe('testers', () => {
   let oada: OADAClient;
+
   before(async () => {
     oada = await connect({ domain, token, connection: 'http' });
   });
+
+  after(async() => await oada.disconnect());
 
   describe('#pathTest', () => {
     it('should have status: success for well-known', async () => {
@@ -53,12 +56,41 @@ describe('testers', () => {
     });
   });
 
-  describe('#revAge', () => {
+  describe('#relativeAge', () => {
+    const leader = '/resources/TRELLIS-MONITOR-TEST-' + ksuid.randomSync().string;
+    const delay = 1001;
+    const follower = '/resources/TRELLIS-MONITOR-TEST-' + ksuid.randomSync().string;
+
+    before(async () => {
+      await oada.put({ path: leader, data: {}, contentType: 'application/json' });
+      await Bluebird.delay(delay); // wait 1 s should be sufficient to test age
+      await oada.put({ path: follower, data: {}, contentType: 'application/json' });
+    });
+
+    after(async () => {
+      await oada.delete({ path: leader });
+      await oada.delete({ path: follower });
+    });
+
+    it('should have status: success for follower within maxage of leader', async () => {
+      const result = await relativeAge({ leader, follower, maxage: 2*delay, oada });
+      expect(result.status).to.equal('success');
+    });
+
+    it('should have status: failure for follower older than maxage from leader', async () => {
+      const result = await relativeAge({ leader, follower, maxage: 0.5 * delay, oada });
+      expect(result.status).to.equal('failure');
+    });
+  });
+
+
+  describe('#maxAge', () => {
     const path = '/resources/TRELLIS-MONITOR-TEST-' + ksuid.randomSync().string;
+    const delay = 1001;
 
     before(async () => {
       await oada.put({ path, data: {}, contentType: 'application/json' });
-      await Bluebird.delay(1001); // wait 1 s should be sufficient to test age
+      await Bluebird.delay(delay); // wait 1 s should be sufficient to test age
     });
 
     after(async () => {
@@ -66,12 +98,12 @@ describe('testers', () => {
     });
 
     it('should have status: success for recently-created resource', async () => {
-      const result = await revAge({ path, maxage: 15, oada });
+      const result = await maxAge({ path, maxage: 2*delay, oada });
       expect(result.status).to.equal('success');
     });
 
     it('should have status: failure for old resource with short maxage', async () => {
-      const result = await revAge({ path, maxage: 1, oada });
+      const result = await maxAge({ path, maxage: 0.5*delay, oada });
       expect(result.status).to.equal('failure');
     });
   });

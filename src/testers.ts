@@ -18,11 +18,20 @@ import ksuid from 'ksuid';
 import moment from 'moment';
 import debug from 'debug';
 
-import type { Change, OADAClient } from '@oada/client';
+import type { OADAClient } from '@oada/client';
+
+export interface TestResult {
+  status: 'success' | 'failure';
+  message?: string | undefined;
+  [key: string]: any;
+}
+
 
 const trace = debug('trellis-monitor:trace');
 
-const pathTest = async ({ path, oada }: { path: string; oada: OADAClient }) => {
+const fmt = 'YYYY-MM-DD HH:mm:ss.SSS';
+
+const pathTest = async ({ path, oada }: { path: string; oada: OADAClient }): Promise<TestResult> => {
   try {
     trace(`pathTest: GET ${path}`);
     await oada.get({ path });
@@ -36,7 +45,7 @@ const pathTest = async ({ path, oada }: { path: string; oada: OADAClient }) => {
   }
 };
 
-const revAge = async ({
+const maxAge = async ({
   path,
   maxage,
   oada,
@@ -44,44 +53,80 @@ const revAge = async ({
   path: string;
   oada: OADAClient;
   maxage: number;
-}) => {
+}): Promise<TestResult> => {
   try {
-    trace(`revAge: testing rev at ${path} against maxage ${maxage}`);
-    const lastrev = await oada
-      .get({ path: `${path}/_rev` })
-      .then((r) => r.data);
-    const changes = (await oada
-      .get({ path: `${path}/_meta/_changes/${lastrev}` })
-      .then((r) => r.data)) as unknown as Change[];
-    // Get the change to ""  (i.e. this node)
-    const change = _.find(changes, (c) => c.path === '');
-    const modified = moment(_.get(change, `body._meta.modified`, 0) * 1000);
+    trace(`maxAge: testing rev at ${path} against maxage ${maxage}`);
+    const modified = +(await oada
+      .get({ path: `${path}/_meta/modified` })
+      .then((r) => r.data) || 0) * 1000; // oada has seconds w/ fractional msec
+    const now = +(new Date());
+    const age = now - modified;
     trace(
-      `revAge: lastrev = ${lastrev}, modified = ${modified.valueOf()}, difference = ${
-        moment().valueOf() - modified.valueOf()
-      }`
+      `maxAge: modified = ${modified} msec, now = ${now}, difference = ${age}`
     );
-    if (moment().valueOf() - modified.valueOf() > maxage * 1000) {
+    if (age > maxage) {
       return {
         status: 'failure',
-        message: `Age of latest rev (${_.get(
-          change,
-          'body._rev'
-        )}) is ${modified.format('YYYY-MM-DD HH:mm:ss')}, older than ${
-          maxage / 3600
-        } hours`,
+        message: `Age of path ${path} at modified time ${moment(modified).format(fmt)} has age ${age} which is older than maxage ${maxage}`,
       };
     }
     return { status: 'success' };
   } catch (e) {
     return {
       status: 'failure',
-      message: `Failed in retrieving age of latest rev.  Error was: ${strError(
+      message: `Failed in retrieving age of path ${path}.  Error was: ${strError(
         e
       )}`,
     };
   }
 };
+
+const relativeAge = async ({
+  leader,
+  follower,
+  maxage,
+  abs,
+  oada,
+}: {
+  leader: string;
+  follower: string;
+  oada: OADAClient;
+  maxage: number;
+  abs?: boolean; // whether to use absolute value for maxage comparison, or strict follower/leader 
+}): Promise<TestResult> => {
+  try {
+    trace(`relativeAge: testing age of leader ${leader} vs. follower ${follower} against maxage ${maxage}`);
+    const leadermodified = +(await oada
+      .get({ path: `${leader}/_meta/modified` })
+      .then((r) => r.data) || 0) * 1000;
+    const followermodified = +(await oada
+      .get({ path: `${follower}/_meta/modified` })
+      .then((r) => r.data) || 0) * 1000;
+
+    let age = followermodified - leadermodified;
+    if (abs) age = Math.abs(age);
+
+    trace(
+      `relativeAge: leadermodified = ${leadermodified}, followermodified = ${followermodified}, difference = ${age}`
+    );
+    if (age > maxage) {
+      return {
+        status: 'failure',
+        message: `Age of follower (${moment(followermodified).format(fmt)}) is ${age} msec, which is older than maxage ${maxage}`,
+      };
+    }
+    return { status: 'success' };
+  } catch (e) {
+    return {
+      status: 'failure',
+      message: `Failed in retrieving age of leader or follower.  Error was: ${strError(
+        e
+      )}`,
+    };
+  }
+};
+
+
 
 const staleKsuidKeys = async ({
   path,
@@ -91,7 +136,7 @@ const staleKsuidKeys = async ({
   path: string;
   maxage: number;
   oada: OADAClient;
-}) => {
+}): Promise<TestResult> => {
   try {
     trace(`staleKsuidKeys: testing ${path} against maxage ${maxage}`);
     const list = await oada.get({ path }).then((r) => r.data);
@@ -139,7 +184,7 @@ const countKeys = async ({
   path: string;
   index: string;
   oada: OADAClient;
-}) => {
+}): Promise<TestResult> => {
   try {
     if (index) {
       switch (index) {
@@ -192,4 +237,4 @@ function strError(e: {
   return JSON.stringify(e, null, '  ');
 }
 
-export { pathTest, revAge, staleKsuidKeys, countKeys };
+export { pathTest, maxAge, relativeAge, staleKsuidKeys, countKeys };

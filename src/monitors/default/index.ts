@@ -33,38 +33,4 @@ export const bookmarks: Test = {
   params: { path: `/bookmarks` },
 };
 
-export const stale_target_jobs: Test = {
-  desc: 'Is target job queue devoid of stale (15-min) jobs?',
-  type: 'staleKsuidKeys',
-  params: {
-    path: `/bookmarks/services/target/jobs`,
-    maxage: 15 * 6, // 15 mins
-  },
-};
 
-export const staging_clean: Test = {
-  desc: 'Does asn-staging have any stale (5-min) ksuid keys?',
-  type: 'staleKsuidKeys',
-  params: {
-    path: `/bookmarks/trellisfw/asn-staging`,
-    maxage: 5 * 60, // 5 mins
-  },
-};
-
-export const staging_inactive: Test = {
-  desc: "Is asn-staging's latest rev newer than 12 hours ago?",
-  type: 'revAge',
-  params: {
-    path: `/bookmarks/trellisfw/asn-staging`,
-    maxage: 12 * 3600, // 12 hours
-  },
-};
-
-export const count_asns_today: Test = {
-  desc: "Count number of ASNs received in today's day-index",
-  type: 'countKeys',
-  params: {
-    path: `/bookmarks/trellisfw/asns`,
-    index: `day-index`, // tells it to count keys in this known typeof index instead of path
-  },
-};

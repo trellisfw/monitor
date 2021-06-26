@@ -17,26 +17,23 @@ import { readdir } from 'fs/promises';
 import { join } from 'path';
 
 import Bluebird from 'bluebird';
-import _ from 'lodash'; // Lazy, lodash isn't really needed anymore;
 import debug from 'debug';
 import express from 'express';
-import uuid from 'uuid';
 import moment from 'moment';
 import cron from 'node-cron';
 import micromatch from 'micromatch';
 
-import { Change, connect } from '@oada/client';
+import { connect, OADAClient } from '@oada/client';
 
 import * as testers from './testers';
+import type { TestResult as ITestResult } from './testers';
 import * as notifiers from './notifiers';
-
-import testasn from './testasn';
 
 import config from './config';
 
 const error = debug('trellis-monitor:error');
 const info = debug('trellis-monitor:info');
-const warn = debug('trellis-monitor:warn');
+//const warn = debug('trellis-monitor:warn');
 const trace = debug('trellis-monitor:trace');
 
 const incomingToken = config.get('server.token');
@@ -49,7 +46,6 @@ if (!domain.match(/^http/)) {
 
 const cronschedule = config.get('notify.cron');
 const notifyurl = config.get('notify.url');
-const timeout = config.get('timeout');
 const notifyname = config.get('notify.name') || config.get('oada.domain');
 
 /**
@@ -67,9 +63,31 @@ export interface Test<P = unknown> {
    */
   type: keyof typeof testers;
   /**
+   * domain for this test (optional, defaults to oada.domain in config)
+   */
+  domain?: string;
+  /**
+   * token for this test (optional, defaults to oada.token in config)
+   */
+  token?: string;
+  /**
    * Parameters for tester
    */
   params: P;
+}
+
+// Re-export TestResult type
+export type TestResult = ITestResult;
+
+// Each "final" test that we store will have the oada connection, domain, and token stored in it
+interface ValidTest<P = unknown> {
+  name: string;
+  desc: string;
+  type: keyof typeof testers;
+  params: P;
+  domain: string;
+  token: string;
+  oada: OADAClient;
 }
 
 const testdir = config.get('tests.dir');
@@ -78,19 +96,6 @@ const testmatch = config.get('tests.enabled').split(',');
 async function run() {
   info('Starting monitor with cron = %s', cronschedule);
 
-  const oada = await connect({
-    domain,
-    token: tokenToRequestAgainstOADA,
-    connection: 'http', // no need to keep open websockets
-  }).catch((e) => {
-    error('ERROR: failed to connect to OADA. The error was: %O', e);
-    throw e;
-  });
-  trace(
-    'Connected to oada, domain = %s, token = %s',
-    domain,
-    tokenToRequestAgainstOADA
-  );
 
   // Is well-known up w/ SSL?
   // Is bookmarks up w/ test token?
@@ -111,30 +116,59 @@ async function run() {
   };
 
   // Load monitor tests
-  const tests: Record<string, Test> = {};
+  const rawtests: Record<string, Test> = {};
   info('Loading all monitor tests from %s', testdir);
   const testfiles = await readdir(testdir);
   for (const t of testfiles) {
     const file = join(testdir, t);
     // Load tests from file
     const tf = (await import(file)) as Record<string, Test>;
-    trace('Loaded monitor tests from %s', file);
+    trace('Loaded monitor tests %o from %s', Object.keys(tf), file);
 
     // Find any enabled tests
     const enabled = micromatch(Object.keys(tf), testmatch);
     trace('Enabling monitor tests %o from %s', enabled, tf);
     for (const t of enabled) {
-      tests[t] = tf[t]!;
+      if (t === 'default') continue; // module.exports in the JS file results in an extra "default" key.  Cannot name a test "default"
+      rawtests[t] = tf[t]!;
     }
   }
+
+  // Add default domain/token to any tests that do not have it,
+  // and while we're at it open oada connections for all unique domain/token pairs
+  const tests: Record<string, ValidTest> = {};
+  const oadapool: Record<string, OADAClient> = {};
+  for (const key of Object.keys(rawtests)) {
+    const rawtest = rawtests[key]!;
+    const d = rawtest.domain || domain;
+    const t = rawtest.token || tokenToRequestAgainstOADA;
+    const pi = `${d}::${t}`; // index into oada connection pool (same connection for same domain/token)
+    // Do we already have an open connection to this domain/token?
+    if (!oadapool[pi]) {
+      oadapool[pi] = await connect({domain: d, token: t, connection: 'http'})
+        .catch((e: unknown) => {
+          error(`ERROR: failed to connect to OADA for domain ${d} and token ${t}.  Error was: %0`, e);
+          throw e;
+        })
+    }
+    // Create the final set of validated tests w/ included oada connection:
+    tests[key] = {
+      name: key,
+      domain: rawtest.domain || domain, // default to global domain from config
+      token: rawtest.token || tokenToRequestAgainstOADA, // default to token from config
+      ...rawtest,
+      oada: oadapool[pi]!,
+    };
+  }
+
 
   //-------------------------------------------------------
   // Trigger testing on a schedule:
   const check = async () => {
     try {
-      trace('Running tests');
-      const testkeys = _.keys(tests);
-      const results = await Bluebird.map(
+      const testkeys = Object.keys(tests);
+      trace(`Running ${testkeys.length} tests`);
+      const results: TestResult[] = await Bluebird.map(
         testkeys,
         async (tk: keyof typeof tests) => {
           trace('Running test %s', tk);
@@ -142,10 +176,13 @@ async function run() {
             const t = tests[tk]!;
             const runner = testers[t.type];
             if (!runner) {
-              return { status: 'failure', message: 'Invalid tester type' };
+              return { 
+                status: 'failure', 
+                message: `Invalid tester type ${t.type}.  Valid types are: ${Object.keys(testers).join(', ')}` 
+              };
             }
             return await runner({
-              oada,
+              oada: t.oada,
               //@ts-ignore
               ...t.params,
             });
@@ -161,17 +198,20 @@ async function run() {
       );
 
       trace('Results of tests: %O', results);
-      status.tests = _.zipObject(testkeys, results);
-      const failures = _.filter(
-        results,
-        (r) => !r.status || r.status !== 'success'
+      // "status.tests" key should have same keys as tests here, but the values are the results of that test
+      status.tests = testkeys.reduce((acc,tk,index) => ({ 
+        ...acc, 
+        [tk]: results[index] 
+      }), {});
+      const failures = results.filter(
+        (r: TestResult) => !r.status || r.status !== 'success'
       );
       trace('Results filtered to failures = %O', failures);
       status.global.status = failures.length < 1 ? 'success' : 'failure';
       status.global.lastruntime = moment().format('YYYY-MM-DD HH:mm:ss');
 
       if (status.global.status === 'success') {
-        info(`${moment().format('YYYY-MM-DD HH:mm:ss')}: Tests all successful`);
+        info(`${status.global.lastruntime}: Tests all successful`);
         return;
       }
 
@@ -253,153 +293,3 @@ async function run() {
 
 run();
 
-async function postOne() {
-  let newkey = false;
-  const con = await connect({
-    domain,
-    token: tokenToRequestAgainstOADA,
-    // @ts-ignore
-    cache: false,
-  });
-  try {
-    trace('Connected to OADA, retrieving current target job queue');
-    const queue = await con
-      .get({ path: '/bookmarks/services/target/jobs' })
-      .then((r) => r.data);
-    const validkeys = _.filter(_.keys(queue), (k) => !k.match(/^_/)); // remove any OADA keys like _id, _rev, _meta
-    if (validkeys.length > 10) {
-      error('Target job queue is longer than 10 items, not posting new ASN');
-      throw new Error(
-        'Target job queue is longer than 10 items, not posting new ASN'
-      );
-    }
-
-    trace('Job queue sufficiently small (< 10), posting test ASN');
-
-    const now = moment().utc().format('X');
-    const rand = uuid.v4().replace(/-/g, '').slice(0, 15);
-    const newkey = `MONITOR-${now}-${rand}`;
-    await con
-      .put({
-        path: `/bookmarks/trellisfw/asn-staging/${newkey}`,
-        data: testasn as any,
-        contentType: 'application/vnd.trellisfw.asn-staging.sf.1+json',
-      })
-      .then((r) => r.headers['content-location']?.slice(1))
-      .catch((e) => {
-        error('FAILED to post ASN to asn-staging!  error was: ', e);
-        throw new Error(
-          'FAILED to post ASN to asn-staging!  error was: ' +
-            JSON.stringify(e, null, '  ')
-        );
-      });
-    info('Document posted to asn-staging as new key', newkey);
-
-    const p = new Bluebird(async (resolve, reject) => {
-      try {
-        // Set a timer to timeout when waiting
-        setTimeout(() => {
-          if (!p.isFulfilled()) {
-            error(
-              'TIMEOUT: took longer than %d ms to fulfill, returning error!',
-              timeout
-            );
-            reject('TIMEOUT: took longer than ' + timeout + 'ms to fulfill');
-          }
-        }, timeout);
-        // Create watch handler
-        function watchHandler(change: Readonly<Change>) {
-          if (!change || change.type !== 'merge') {
-            trace(
-              'received change, but was not a merge.  change was: ',
-              change
-            );
-            return;
-          }
-          // @ts-ignore
-          if (!change.body[newkey]) {
-            trace(
-              'received change, but was not to the new key.  change was: ',
-              change
-            );
-            return;
-          }
-          trace(
-            `Received change on ${newkey}, will check if it is meta as "asset created"`
-          );
-          // @ts-ignore
-          const meta = change.body[newkey]._meta;
-          trace('change meta = ', meta);
-          if (!meta) {
-            trace('received change, and to the right key, but not to meta');
-            return;
-          }
-          const target =
-            meta.services && meta.services.target && meta.services.target.tasks;
-          if (!target) {
-            trace(
-              'received change, and to the right key w/ meta, but not to meta.services.target.tasks'
-            );
-            return;
-          }
-          // JSON.stringify to make looking through all tasks much simpler
-          const str = JSON.stringify(target);
-          if (str.match(/asset[ _-]+created/i)) {
-            trace('received change, asset is created, resolving promise');
-            trace('successful change was: ', change);
-            // @ts-ignore
-            return resolve(change.body[newkey]._rev);
-          }
-          trace('received change, but nothing matches "asset created"');
-        }
-        // Set a watch on asn's, look for this key to show up
-        await con.get({
-          path: '/bookmarks/trellisfw/asns',
-          watchCallback: watchHandler,
-        });
-      } catch (e) {
-        error('FAILED waiting for success, never saw it');
-        //res.json({ error: true, message: JSON.stringify(e, null, '  ') });
-        throw e;
-      }
-    });
-    //const success_rev = await p;
-    info('Overall test successful on key ', newkey);
-    //currentlysuccess = true;
-    //latestmessage = `ASN push to IFT succeeded on id ${newkey} on rev ${success_rev}`;
-  } catch (e) {
-    error('FAILED waiting for success, never saw it');
-    //currentlysuccess = false;
-    //latestmessage = JSON.stringify(e, false, '  ');
-  } finally {
-    // Delete the asn-staging entry, the asns entry, and the resource itself
-    if (newkey) {
-      warn(
-        'You have commented all the deletes, so all monitor-generated ASN resources will stay there.'
-      );
-      /*
-      try {
-        await Promise.all([
-          con.get({path:`/bookmarks/trellisfw/asn-staging/${newkey}`})
-            .then(() => con.delete({ path: `/bookmarks/trellisfw/asn-staging/${newkey}`, headers: { 'content-type': 'application/json' } }))
-            .catch(e => warn(`/bookmarks/trellisfw/asn-staging/${newkey} did not exist to delete when done.  Error was: `,(e.response.status===404?e.response.status:e))),
-
-          con.get({ path: `/bookmarks/trellisfw/asns/${newkey}` })
-            .then(() => con.delete({ path: `/bookmarks/trellisfw/asns/${newkey}`, headers: { 'content-type': 'application/json' } }))
-            .catch(e => warn(`/bookmarks/trellisfw/asns/${newkey} did not exist to delete when done.  Error was: `,(e.response.status===404?e.response.status:e))),
-
-          con.get({ path: `/resources/${newkey}` })
-            .then(() => con.delete({ path: `/resources/${newkey}`, headers: { 'content-type': 'application/json' } }))
-            .catch(e => warn(`/resources/${newkey} did not exist to delete when done.  Error was `,(e.response.status===404?e.response.status:e))),
-        ]);
-      } catch(e) {
-        error('FAILED on cleanup of resources.  Alreay sent error, so failing silently.');
-      }
-      */
-    }
-    con.disconnect();
-    trace('DONE!');
-  }
-}
-
-export { postOne };

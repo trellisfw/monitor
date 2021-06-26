@@ -9,7 +9,7 @@
   "scripts": {
     "build": "tsc -b",
     "start": "node --enable-source-maps dist/index.js",
-    "test": "mocha"
+    "test": "NODE_TLS_REJECT_UNAUTHORIZED=0 mocha"
   },
   "mocha": {
     "require": "ts-node/register",
