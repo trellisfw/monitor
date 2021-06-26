@@ -1,7 +1,4 @@
 services:
-  http-handler:
-    volumes:
-      - ./services/trellis-monitor/support/scopes.js:/code/scopes/additional-scopes/monitor_scopes.js
 
   # Add our proxy route to nginx
   proxy:
