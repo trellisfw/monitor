@@ -23,6 +23,7 @@ import type { OADAClient } from '@oada/client';
 export interface TestResult {
   status: 'success' | 'failure';
   message?: string | undefined;
+  desc?: string | undefined;
   [key: string]: any;
 }
 
@@ -103,11 +104,16 @@ const relativeAge = async ({
       .get({ path: `${follower}/_meta/modified` })
       .then((r) => r.data) || 0) * 1000;
 
-    let age = followermodified - leadermodified;
+    // Follower should be NEWER than leader.  Failure is when it is OLDER than
+    // leader, and by at least maxage.  Therefore, the test is leader(assume newer)
+    // minus follower(assume older), which is positive only when follower is actually
+    // older.  If follower is indeed newer, leader - follower will be negative, so
+    // a negative "age" will always be less than the positive "maxage".
+    let age = leadermodified - followermodified;
     if (abs) age = Math.abs(age);
 
     trace(
-      `relativeAge: leadermodified = ${leadermodified}, followermodified = ${followermodified}, difference = ${age}`
+      `relativeAge: leadermodified = ${leadermodified}, followermodified = ${followermodified}, leader - follower = ${age}`
     );
     if (age > maxage) {
       return {

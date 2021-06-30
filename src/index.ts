@@ -79,6 +79,19 @@ export interface Test<P = unknown> {
 // Re-export TestResult type
 export type TestResult = ITestResult;
 
+// Type of the "status" that is reported globally:
+export interface Status {
+  global: {
+    server: string;
+    status: 'failure' | 'success';
+    lastruntime: string;
+  };
+  tests: {
+    [key: string]: TestResult;
+  }
+};
+
+
 // Each "final" test that we store will have the oada connection, domain, and token stored in it
 interface ValidTest<P = unknown> {
   name: string;
@@ -105,7 +118,7 @@ async function run() {
   // asns/day-index: count the number of keys today for reporting
   // We will refrain from posting a dummy ASN for now, can use "postOne" if we want to.
 
-  const status = {
+  const status: Status = {
     global: {
       // Report which server this was?
       server: notifyname,
@@ -168,7 +181,7 @@ async function run() {
     try {
       const testkeys = Object.keys(tests);
       trace(`Running ${testkeys.length} tests`);
-      const results: TestResult[] = await Bluebird.map(
+      let results: TestResult[] = await Bluebird.map(
         testkeys,
         async (tk: keyof typeof tests) => {
           trace('Running test %s', tk);
@@ -197,12 +210,24 @@ async function run() {
         { concurrency: 1 }
       );
 
+
       trace('Results of tests: %O', results);
       // "status.tests" key should have same keys as tests here, but the values are the results of that test
       status.tests = testkeys.reduce((acc,tk,index) => ({ 
         ...acc, 
         [tk]: results[index] 
       }), {});
+      // Walk all the tests and augment with description from the test for any failures:
+      for (const testkey of Object.keys(status.tests)) {
+        const result = status.tests[testkey]!;
+        if (status.tests[testkey]!.status === 'success') continue; // leave success tests w/o a desc for brevity
+        if (status.tests[testkey]!.desc) continue; // alrady has a desc from the test itself, leave it alone
+        if (tests[testkey]!.desc) {
+          result.desc = tests[testkey]!.desc; // if there is a desc on the test, include it here
+        }
+      }
+
+          
       const failures = results.filter(
         (r: TestResult) => !r.status || r.status !== 'success'
       );
