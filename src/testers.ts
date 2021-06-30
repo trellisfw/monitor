@@ -86,14 +86,12 @@ const relativeAge = async ({
   leader,
   follower,
   maxage,
-  abs,
   oada,
 }: {
   leader: string;
   follower: string;
   oada: OADAClient;
   maxage: number;
-  abs?: boolean; // whether to use absolute value for maxage comparison, or strict follower/leader 
 }): Promise<TestResult> => {
   try {
     trace(`relativeAge: testing age of leader ${leader} vs. follower ${follower} against maxage ${maxage}`);
@@ -103,22 +101,20 @@ const relativeAge = async ({
     const followermodified = +(await oada
       .get({ path: `${follower}/_meta/modified` })
       .then((r) => r.data) || 0) * 1000;
+    const now = +(new Date());
 
-    // Follower should be NEWER than leader.  Failure is when it is OLDER than
-    // leader, and by at least maxage.  Therefore, the test is leader(assume newer)
-    // minus follower(assume older), which is positive only when follower is actually
-    // older.  If follower is indeed newer, leader - follower will be negative, so
-    // a negative "age" will always be less than the positive "maxage".
-    let age = leadermodified - followermodified;
-    if (abs) age = Math.abs(age);
+    // Give the follower a grade period of maxage to figure out what to do before we would
+    // consider it an error
+    const leaderage = now - leadermodified;
+    const relativeage = followermodified - leadermodified;
 
     trace(
-      `relativeAge: leadermodified = ${leadermodified}, followermodified = ${followermodified}, leader - follower = ${age}`
+      `relativeAge: leadermodified = ${leadermodified}, followermodified = ${followermodified}, now = ${now}, now - leader  = ${leaderage}`
     );
-    if (age > maxage) {
+    if (leaderage > maxage && relativeage < 0) { // leader has waited long enough for follower, but follower is still behind
       return {
         status: 'failure',
-        message: `Age of follower (${moment(followermodified).format(fmt)}) is ${age} msec, which is older than maxage ${maxage}`,
+        message: `Waited ${leaderage} msec (maxage ${maxage}) since leader was modified (${leadermodified}), but follower still has not updated (last modified ${followermodified})`,
       };
     }
     return { status: 'success' };

@@ -65,11 +65,9 @@ describe('testers', () => {
     before(async () => {
       // "slow_follower" should be stale, i.e. must be BEFORE leader writes
       await oada.put({ path: slow_follower, data: {}, contentType: 'application/json' });
-      await Bluebird.delay(delay); // wait 1 s
-      // "slow_follower" will be ~1 sec older than leader, but it should be newer than leader
       await oada.put({ path: leader, data: {}, contentType: 'application/json' });
-      // "fast_follower" will be the newest timestamp of all, regardless of delay, and is AFTER leader
       await oada.put({ path: fast_follower, data: {}, contentType: 'application/json' });
+      await Bluebird.delay(delay); // wait 1 s to start tests so now() is at least 1 sec
     });
 
     after(async () => {
@@ -78,18 +76,18 @@ describe('testers', () => {
       await oada.delete({ path: fast_follower });
     });
 
-    it('should have status: success for fast follower AFTER leader', async () => {
+    it('should have status: success for fast follower updated after leader', async () => {
       const result = await relativeAge({ leader, follower: fast_follower, maxage: delay, oada });
       expect(result.status).to.equal('success');
     });
 
-    it('should have status: failure for slow follower more than maxage BEFORE leader', async () => {
-      const result = await relativeAge({ leader, follower: slow_follower, maxage: 0.5 * delay, oada });
+    it('should have status: failure for slow follower not updated since maxage of leader update', async () => {
+      const result = await relativeAge({ leader, follower: slow_follower, maxage: delay, oada });
       expect(result.status).to.equal('failure');
     });
 
     it('should have status: success for slow follower less than maxage BEFORE leader', async() => {
-      const result = await relativeAge({ leader, follower: slow_follower, maxage: 2 * delay, oada });
+      const result = await relativeAge({ leader, follower: slow_follower, maxage: 5 * delay, oada });
       expect(result.status).to.equal('success');
     });
     
