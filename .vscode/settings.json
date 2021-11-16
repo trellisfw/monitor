@@ -45,6 +45,8 @@
     "codeql",
     "ksuid",
     "ksuids",
+    "metas",
+    "MONITIS",
     "OADA",
     "Snyk",
     "sonarjs",

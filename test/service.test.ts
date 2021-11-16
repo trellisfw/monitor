@@ -15,17 +15,18 @@
  * limitations under the License.
  */
 
-import { setTimeout } from 'timers/promises';
+import { setTimeout } from 'node:timers/promises';
 
+import debug from 'debug';
 import { expect } from 'chai';
 import ksuid from 'ksuid';
 import tiny from 'tiny-json-http';
-import debug from 'debug';
 
-import { connect, OADAClient } from '@oada/client';
+import { OADAClient, connect } from '@oada/client';
 
 import config from '../src/config';
 
+const log = debug('trellis-monitor:debug');
 const trace = debug('trellis-monitor:trace');
 
 const domain = config.get('oada.domain');
@@ -72,7 +73,9 @@ describe('service', () => {
   });
 
   it('should fail on check after posting stale asn-staging ksuid key', async () => {
-    const oldKSUID = ksuid.randomSync(new Date('2021-02-03T01:00:00Z')).string;
+    const { string: oldKSUID } = await ksuid.random(
+      new Date('2021-02-03T01:00:00Z')
+    );
     const path = `/bookmarks/trellisfw/asn-staging`;
     await oada.put({
       path,
@@ -82,57 +85,58 @@ describe('service', () => {
     const url = `http://localhost:${config.get('server.port')}/trigger`;
     trace('Getting trigger at url ', url);
 
-    let service_is_running = false;
-    let status = '';
+    let serviceIsRunning = false;
+    let status: unknown = '';
     try {
-      const res = await tiny.get({
+      const response = await tiny.get({
         url,
         headers: { authorization: `Bearer ${incomingToken}` },
       });
-      service_is_running = true;
-      status = res?.body?.tests?.staging_clean?.status;
-      trace('Done w/ trigger, checking body: ', res.body);
-    } catch (e) {
-      if (e.code !== 'ECONNREFUSED') {
-        // service is running, but something went wrong
-        throw e;
+      serviceIsRunning = true;
+      status = response?.body?.tests?.staging_clean?.status;
+      trace('Done w/ trigger, checking body: ', response.body);
+    } catch (error: unknown) {
+      // @ts-expect-error errors are annoying
+      if (error.code !== 'ECONNREFUSED') {
+        // Service is running, but something went wrong
+        throw error;
       }
+
       trace('Service does not appear to be running, skipping this test');
-      service_is_running = false; // service isn't running, test is irrelevant
+      serviceIsRunning = false; // Service isn't running, test is irrelevant
     }
+
     // Cleanup the stale ksuid before testing:
     await oada.delete({ path: `${path}/${oldKSUID}` });
     // Only perform the expectation if service is actually running:
-    if (service_is_running) {
+    if (serviceIsRunning) {
       expect(status).to.equal('failure');
     }
   });
 });
 
-if (run) {
-  console.log(
-    '--delay passed, waiting 2 seconds before starting service tests'
-  );
-  setTimeout(2000).then(() => {
-    console.log('Done waiting, starting service tests');
-    run();
-  });
-}
-
 async function ensurePath(path: string, oada: OADAClient) {
-  await oada.head({ path }).catch(async (e) => {
-    if (e.status === 404) {
-      console.log(
-        'ensurePath: path ' + path + ' did not exist before test, creating'
-      );
+  try {
+    await oada.head({ path });
+  } catch (error: unknown) {
+    // @ts-expect-error errors are annoying
+    if (error.status === 404) {
+      log(`ensurePath: path ${path} did not exist before test, creating`);
       await oada.put({ path, tree, data: {} });
       return;
     }
-    console.log(
-      'ERROR: ensurePath: HEAD to path ' +
-        path +
-        ' returned non-404 error status: ',
-      e
+
+    log(
+      `ERROR: ensurePath: HEAD to path ${path} returned non-404 error status:`,
+      error
     );
-  });
+  }
+}
+
+if (run) {
+  log('--delay passed, waiting 2 seconds before starting service tests');
+  // @ts-expect-error this is a module
+  await setTimeout(2000);
+  log('Done waiting, starting service tests');
+  run();
 }

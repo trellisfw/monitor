@@ -15,20 +15,21 @@
  * limitations under the License.
  */
 
-import { setTimeout } from 'timers/promises';
+import { setTimeout } from 'node:timers/promises';
 
+import { OADAClient, connect } from '@oada/client';
 import { expect } from 'chai';
-import { connect, OADAClient } from '@oada/client';
 import ksuid from 'ksuid';
-import config from '../src/config';
 import moment from 'moment';
+
 import {
-  pathTest,
+  countKeys,
   maxAge,
+  pathTest,
   relativeAge,
   staleKsuidKeys,
-  countKeys,
 } from '../src/testers';
+import config from '../src/config';
 
 const domain = config.get('oada.domain');
 const token = config.get('oada.token');
@@ -40,7 +41,7 @@ describe('testers', () => {
     oada = await connect({ domain, token, connection: 'http' });
   });
 
-  after(async () => await oada.disconnect());
+  after(async () => oada.disconnect());
 
   describe('#pathTest', () => {
     it('should have status: success for well-known', async () => {
@@ -66,19 +67,23 @@ describe('testers', () => {
   });
 
   describe('#relativeAge', () => {
-    const leader =
-      '/resources/TRELLIS-MONITOR-TEST-' + ksuid.randomSync().string;
+    const leader = `/resources/TRELLIS-MONITOR-TEST-${
+      ksuid.randomSync().string
+    }`;
     const delay = 1000;
-    const fast_follower =
-      '/resources/TRELLIS-MONITOR-TEST-' + ksuid.randomSync().string;
-    const slow_follower =
-      '/resources/TRELLIS-MONITOR-TEST-' + ksuid.randomSync().string;
+    const fastFollower = `/resources/TRELLIS-MONITOR-TEST-${
+      ksuid.randomSync().string
+    }`;
+    const slowFollower = `/resources/TRELLIS-MONITOR-TEST-${
+      ksuid.randomSync().string
+    }`;
 
     before(async () => {
       // "slow_follower" should be stale, i.e. must be BEFORE leader writes
       await oada.put({
-        path: slow_follower,
+        path: slowFollower,
         data: {},
+        // eslint-disable-next-line sonarjs/no-duplicate-string
         contentType: 'application/json',
       });
       await oada.put({
@@ -87,23 +92,23 @@ describe('testers', () => {
         contentType: 'application/json',
       });
       await oada.put({
-        path: fast_follower,
+        path: fastFollower,
         data: {},
         contentType: 'application/json',
       });
-      await setTimeout(delay); // wait 1 s to start tests so now() is at least 1 sec
+      await setTimeout(delay); // Wait 1 s to start tests so now() is at least 1 sec
     });
 
     after(async () => {
       await oada.delete({ path: leader });
-      await oada.delete({ path: slow_follower });
-      await oada.delete({ path: fast_follower });
+      await oada.delete({ path: slowFollower });
+      await oada.delete({ path: fastFollower });
     });
 
     it('should have status: success for fast follower updated after leader', async () => {
       const result = await relativeAge({
         leader,
-        follower: fast_follower,
+        follower: fastFollower,
         maxage: delay,
         oada,
       });
@@ -113,7 +118,7 @@ describe('testers', () => {
     it('should have status: failure for slow follower not updated since maxage of leader update', async () => {
       const result = await relativeAge({
         leader,
-        follower: slow_follower,
+        follower: slowFollower,
         maxage: delay,
         oada,
       });
@@ -123,7 +128,7 @@ describe('testers', () => {
     it('should have status: success for slow follower less than maxage BEFORE leader', async () => {
       const result = await relativeAge({
         leader,
-        follower: slow_follower,
+        follower: slowFollower,
         maxage: 5 * delay,
         oada,
       });
@@ -132,12 +137,12 @@ describe('testers', () => {
   });
 
   describe('#maxAge', () => {
-    const path = '/resources/TRELLIS-MONITOR-TEST-' + ksuid.randomSync().string;
+    const path = `/resources/TRELLIS-MONITOR-TEST-${ksuid.randomSync().string}`;
     const delay = 1001;
 
     before(async () => {
       await oada.put({ path, data: {}, contentType: 'application/json' });
-      await setTimeout(delay); // wait 1 s should be sufficient to test age
+      await setTimeout(delay); // Wait 1 s should be sufficient to test age
     });
 
     after(async () => {
@@ -156,12 +161,12 @@ describe('testers', () => {
   });
 
   describe('#staleKsuidKeys', () => {
-    const path = '/resources/TRELLIS-MONITOR-TEST-' + ksuid.randomSync().string;
+    const path = `/resources/TRELLIS-MONITOR-TEST-${ksuid.randomSync().string}`;
     const newKSUID = ksuid.randomSync().string;
     const oldKSUID = ksuid.randomSync(new Date('2021-02-03T01:00:00Z')).string;
     before(async () => {
       await oada.put({ path, data: {}, contentType: 'application/json' });
-      await setTimeout(1001); // wait 1 s should be sufficient to test age
+      await setTimeout(1001); // Wait 1 s should be sufficient to test age
     });
 
     after(async () => oada.delete({ path }));
@@ -190,10 +195,12 @@ describe('testers', () => {
   });
 
   describe('#countKeys', () => {
-    const parentID =
-      'resources/TRELLIS-MONITOR-TEST-' + ksuid.randomSync().string;
-    const indexID =
-      'resources/TRELLIS-MONITOR-TEST-' + ksuid.randomSync().string;
+    const parentID = `resources/TRELLIS-MONITOR-TEST-${
+      ksuid.randomSync().string
+    }`;
+    const indexID = `resources/TRELLIS-MONITOR-TEST-${
+      ksuid.randomSync().string
+    }`;
 
     before(async () => {
       await oada.put({
