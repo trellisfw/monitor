@@ -1,4 +1,6 @@
-/* Copyright 2020 Qlever LLC
+/**
+ * @license
+ *  Copyright 2020 Qlever LLC
  *
  * Licensed under the Apache License, Version 2.0 (the 'License');
  * you may not use this file except in compliance with the License.
@@ -13,7 +15,8 @@
  * limitations under the License.
  */
 
-import { join } from 'path';
+import { dirname, join } from 'node:path';
+import url from 'node:url';
 
 import convict from 'convict';
 import { config as load } from 'dotenv';
@@ -83,7 +86,7 @@ const config = convict({
     dir: {
       doc: 'directory of "test modules" to load',
       format: String,
-      default: join(__dirname, './monitors'),
+      default: join(dirname(url.fileURLToPath(import.meta.url)), './monitors'),
       env: 'TESTS_DIR',
     },
     enabled: {

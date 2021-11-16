@@ -1,4 +1,6 @@
-/* Copyright 2021 Qlever LLC
+/**
+ * @license
+ *  Copyright 2021 Qlever LLC
  *
  * Licensed under the Apache License, Version 2.0 (the 'License');
  * you may not use this file except in compliance with the License.
@@ -13,13 +15,20 @@
  * limitations under the License.
  */
 
+import { setTimeout } from 'timers/promises';
+
 import { expect } from 'chai';
 import { connect, OADAClient } from '@oada/client';
 import ksuid from 'ksuid';
 import config from '../src/config';
-import Bluebird from 'bluebird';
 import moment from 'moment';
-import { pathTest, maxAge, relativeAge, staleKsuidKeys, countKeys } from '../src/testers';
+import {
+  pathTest,
+  maxAge,
+  relativeAge,
+  staleKsuidKeys,
+  countKeys,
+} from '../src/testers';
 
 const domain = config.get('oada.domain');
 const token = config.get('oada.token');
@@ -31,7 +40,7 @@ describe('testers', () => {
     oada = await connect({ domain, token, connection: 'http' });
   });
 
-  after(async() => await oada.disconnect());
+  after(async () => await oada.disconnect());
 
   describe('#pathTest', () => {
     it('should have status: success for well-known', async () => {
@@ -57,17 +66,32 @@ describe('testers', () => {
   });
 
   describe('#relativeAge', () => {
-    const leader = '/resources/TRELLIS-MONITOR-TEST-' + ksuid.randomSync().string;
+    const leader =
+      '/resources/TRELLIS-MONITOR-TEST-' + ksuid.randomSync().string;
     const delay = 1000;
-    const fast_follower = '/resources/TRELLIS-MONITOR-TEST-' + ksuid.randomSync().string;
-    const slow_follower = '/resources/TRELLIS-MONITOR-TEST-' + ksuid.randomSync().string;
+    const fast_follower =
+      '/resources/TRELLIS-MONITOR-TEST-' + ksuid.randomSync().string;
+    const slow_follower =
+      '/resources/TRELLIS-MONITOR-TEST-' + ksuid.randomSync().string;
 
     before(async () => {
       // "slow_follower" should be stale, i.e. must be BEFORE leader writes
-      await oada.put({ path: slow_follower, data: {}, contentType: 'application/json' });
-      await oada.put({ path: leader, data: {}, contentType: 'application/json' });
-      await oada.put({ path: fast_follower, data: {}, contentType: 'application/json' });
-      await Bluebird.delay(delay); // wait 1 s to start tests so now() is at least 1 sec
+      await oada.put({
+        path: slow_follower,
+        data: {},
+        contentType: 'application/json',
+      });
+      await oada.put({
+        path: leader,
+        data: {},
+        contentType: 'application/json',
+      });
+      await oada.put({
+        path: fast_follower,
+        data: {},
+        contentType: 'application/json',
+      });
+      await setTimeout(delay); // wait 1 s to start tests so now() is at least 1 sec
     });
 
     after(async () => {
@@ -77,22 +101,35 @@ describe('testers', () => {
     });
 
     it('should have status: success for fast follower updated after leader', async () => {
-      const result = await relativeAge({ leader, follower: fast_follower, maxage: delay, oada });
+      const result = await relativeAge({
+        leader,
+        follower: fast_follower,
+        maxage: delay,
+        oada,
+      });
       expect(result.status).to.equal('success');
     });
 
     it('should have status: failure for slow follower not updated since maxage of leader update', async () => {
-      const result = await relativeAge({ leader, follower: slow_follower, maxage: delay, oada });
+      const result = await relativeAge({
+        leader,
+        follower: slow_follower,
+        maxage: delay,
+        oada,
+      });
       expect(result.status).to.equal('failure');
     });
 
-    it('should have status: success for slow follower less than maxage BEFORE leader', async() => {
-      const result = await relativeAge({ leader, follower: slow_follower, maxage: 5 * delay, oada });
+    it('should have status: success for slow follower less than maxage BEFORE leader', async () => {
+      const result = await relativeAge({
+        leader,
+        follower: slow_follower,
+        maxage: 5 * delay,
+        oada,
+      });
       expect(result.status).to.equal('success');
     });
-    
   });
-
 
   describe('#maxAge', () => {
     const path = '/resources/TRELLIS-MONITOR-TEST-' + ksuid.randomSync().string;
@@ -100,7 +137,7 @@ describe('testers', () => {
 
     before(async () => {
       await oada.put({ path, data: {}, contentType: 'application/json' });
-      await Bluebird.delay(delay); // wait 1 s should be sufficient to test age
+      await setTimeout(delay); // wait 1 s should be sufficient to test age
     });
 
     after(async () => {
@@ -108,23 +145,23 @@ describe('testers', () => {
     });
 
     it('should have status: success for recently-created resource', async () => {
-      const result = await maxAge({ path, maxage: 2*delay, oada });
+      const result = await maxAge({ path, maxage: 2 * delay, oada });
       expect(result.status).to.equal('success');
     });
 
     it('should have status: failure for old resource with short maxage', async () => {
-      const result = await maxAge({ path, maxage: 0.5*delay, oada });
+      const result = await maxAge({ path, maxage: 0.5 * delay, oada });
       expect(result.status).to.equal('failure');
     });
   });
 
   describe('#staleKsuidKeys', () => {
     const path = '/resources/TRELLIS-MONITOR-TEST-' + ksuid.randomSync().string;
-    const newksuid = ksuid.randomSync().string;
-    const oldksuid = ksuid.randomSync(new Date('2021-02-03T01:00:00Z')).string;
+    const newKSUID = ksuid.randomSync().string;
+    const oldKSUID = ksuid.randomSync(new Date('2021-02-03T01:00:00Z')).string;
     before(async () => {
       await oada.put({ path, data: {}, contentType: 'application/json' });
-      await Bluebird.delay(1001); // wait 1 s should be sufficient to test age
+      await setTimeout(1001); // wait 1 s should be sufficient to test age
     });
 
     after(async () => oada.delete({ path }));
@@ -132,7 +169,7 @@ describe('testers', () => {
     it('should have status: success for resource w/ recent ksuid key', async () => {
       await oada.put({
         path,
-        data: { [newksuid]: true },
+        data: { [newKSUID]: true },
         contentType: 'application/json',
       });
       const result = await staleKsuidKeys({ path, maxage: 60, oada });
@@ -143,7 +180,7 @@ describe('testers', () => {
     it('should have status: failure for resource w/ old ksuid key', async () => {
       await oada.put({
         path,
-        data: { [oldksuid]: true },
+        data: { [oldKSUID]: true },
         contentType: 'application/json',
       });
       const result = await staleKsuidKeys({ path, maxage: 1, oada });
@@ -153,35 +190,35 @@ describe('testers', () => {
   });
 
   describe('#countKeys', () => {
-    const parentid =
+    const parentID =
       'resources/TRELLIS-MONITOR-TEST-' + ksuid.randomSync().string;
-    const indexid =
+    const indexID =
       'resources/TRELLIS-MONITOR-TEST-' + ksuid.randomSync().string;
 
     before(async () => {
       await oada.put({
-        path: `/${indexid}`,
+        path: `/${indexID}`,
         data: { key1: 'val1', key2: 'val2' },
         contentType: 'application/json',
       });
       await oada.put({
-        path: `/${parentid}`,
+        path: `/${parentID}`,
         data: {
           'day-index': {
-            [moment().format('YYYY-MM-DD')]: { _id: indexid, _rev: 0 },
+            [moment().format('YYYY-MM-DD')]: { _id: indexID, _rev: 0 },
           },
         },
         contentType: 'application/json',
       });
     });
     after(async () => {
-      await oada.delete({ path: `/${parentid}` });
-      await oada.delete({ path: `/${indexid}` });
+      await oada.delete({ path: `/${parentID}` });
+      await oada.delete({ path: `/${indexID}` });
     });
 
     it('should have status: success and count=2 for resource w/ 2 keys', async () => {
       const result = await countKeys({
-        path: `/${parentid}`,
+        path: `/${parentID}`,
         index: 'day-index',
         oada,
       });

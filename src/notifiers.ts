@@ -1,4 +1,6 @@
-/* Copyright 2021 Qlever LLC
+/**
+ * @license
+ *  Copyright 2021 Qlever LLC
  *
  * Licensed under the Apache License, Version 2.0 (the 'License');
  * you may not use this file except in compliance with the License.
@@ -13,9 +15,9 @@
  * limitations under the License.
  */
 
-import tiny from 'tiny-json-http';
-import moment from 'moment';
 import debug from 'debug';
+import moment from 'moment';
+import tiny from 'tiny-json-http';
 
 const info = debug('trellis-monitor:info');
 const error = debug('trellis-monitor:error');
@@ -45,12 +47,12 @@ export const notifySlack = async (notifyurl: string, status: unknown) => {
     attachments: [
       {
         blocks: [
-          // doing the code in an "attachement" makes it "secondary" and therefore collapsed by default
+          // Doing the code in an "attachment" makes it "secondary" and therefore collapsed by default
           {
             type: 'section',
             text: {
               type: 'mrkdwn',
-              text: `\`\`\`${JSON.stringify(status, null, '  ')}\`\`\``,
+              text: `\`\`\`${JSON.stringify(status, undefined, '  ')}\`\`\``,
             },
           },
         ],
@@ -58,17 +60,17 @@ export const notifySlack = async (notifyurl: string, status: unknown) => {
     ],
   };
 
-  await tiny
-    .post({
+  try {
+    await tiny.post({
       url: notifyurl,
       data: message,
       headers: { 'content-type': 'application/json' },
-    })
-    .then(() => info('notifySlack: Successfully posted status to slack'))
-    .catch((e) => {
-      error(
-        'finishReporters#slack: ERROR: failed to post message to slack!  Error was: ',
-        e
-      );
     });
+    info('notifySlack: Successfully posted status to slack');
+  } catch (cError: unknown) {
+    error(
+      'finishReporters#slack: ERROR: failed to post message to slack!  Error was: ',
+      cError
+    );
+  }
 };

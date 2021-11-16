@@ -1,4 +1,6 @@
-/* Copyright 2021 Qlever LLC
+/**
+ * @license
+ *  Copyright 2021 Qlever LLC
  *
  * Licensed under the Apache License, Version 2.0 (the 'License');
  * you may not use this file except in compliance with the License.
@@ -19,6 +21,8 @@
  * This module is the default set of monitoring tests
  */
 
+/* eslint-disable @typescript-eslint/naming-convention */
+
 import type { Test } from '../../';
 
 export const well_known_ssl: Test = {
@@ -32,5 +36,3 @@ export const bookmarks: Test = {
   type: 'pathTest',
   params: { path: `/bookmarks` },
 };
-
-

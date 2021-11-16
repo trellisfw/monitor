@@ -1,6 +1,6 @@
 services:
   trellis-monitor:
-    build: 
+    build:
       context: .
     expose:
       - 8080

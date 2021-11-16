@@ -1,4 +1,6 @@
-/* Copyright 2021 Qlever LLC
+/**
+ * @license
+ *  Copyright 2021 Qlever LLC
  *
  * Licensed under the Apache License, Version 2.0 (the 'License');
  * you may not use this file except in compliance with the License.
@@ -13,11 +15,11 @@
  * limitations under the License.
  */
 
+import { setTimeout } from 'timers/promises';
+
 import { expect } from 'chai';
 import ksuid from 'ksuid';
-import Bluebird from 'bluebird';
 import tiny from 'tiny-json-http';
-import _ from 'lodash';
 import debug from 'debug';
 
 import { connect, OADAClient } from '@oada/client';
@@ -49,7 +51,7 @@ const tree = {
       target: {
         _type: 'application/vnd.oada.service.1+json',
         jobs: {
-          _type: 'applicaiton/vnd.oada.service.jobs.1+json',
+          _type: 'application/vnd.oada.service.jobs.1+json',
         },
       },
     },
@@ -70,11 +72,11 @@ describe('service', () => {
   });
 
   it('should fail on check after posting stale asn-staging ksuid key', async () => {
-    const oldksuid = ksuid.randomSync(new Date('2021-02-03T01:00:00Z')).string;
+    const oldKSUID = ksuid.randomSync(new Date('2021-02-03T01:00:00Z')).string;
     const path = `/bookmarks/trellisfw/asn-staging`;
     await oada.put({
       path,
-      data: { [oldksuid]: { istest: true } },
+      data: { [oldKSUID]: { istest: true } },
       contentType: 'application/json',
     });
     const url = `http://localhost:${config.get('server.port')}/trigger`;
@@ -88,17 +90,18 @@ describe('service', () => {
         headers: { authorization: `Bearer ${incomingToken}` },
       });
       service_is_running = true;
-      status = _.get(res!.body, 'tests.staging_clean.status');
+      status = res?.body?.tests?.staging_clean?.status;
       trace('Done w/ trigger, checking body: ', res.body);
     } catch (e) {
-      if (e.code !== 'ECONNREFUSED') { // service is running, but something went wrong
+      if (e.code !== 'ECONNREFUSED') {
+        // service is running, but something went wrong
         throw e;
       }
       trace('Service does not appear to be running, skipping this test');
       service_is_running = false; // service isn't running, test is irrelevant
     }
     // Cleanup the stale ksuid before testing:
-    await oada.delete({ path: `${path}/${oldksuid}` });
+    await oada.delete({ path: `${path}/${oldKSUID}` });
     // Only perform the expectation if service is actually running:
     if (service_is_running) {
       expect(status).to.equal('failure');
@@ -110,7 +113,7 @@ if (run) {
   console.log(
     '--delay passed, waiting 2 seconds before starting service tests'
   );
-  Bluebird.delay(2000).then(() => {
+  setTimeout(2000).then(() => {
     console.log('Done waiting, starting service tests');
     run();
   });

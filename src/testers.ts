@@ -1,4 +1,6 @@
-/* Copyright 2021 Qlever LLC
+/**
+ * @license
+ *  Copyright 2021 Qlever LLC
  *
  * Licensed under the Apache License, Version 2.0 (the 'License');
  * you may not use this file except in compliance with the License.
@@ -13,35 +15,39 @@
  * limitations under the License.
  */
 
-import _ from 'lodash';
+import debug from 'debug';
 import ksuid from 'ksuid';
 import moment from 'moment';
-import debug from 'debug';
 
 import type { OADAClient } from '@oada/client';
 
 export interface TestResult {
+  [key: string]: unknown;
   status: 'success' | 'failure';
   message?: string | undefined;
   desc?: string | undefined;
-  [key: string]: any;
 }
-
 
 const trace = debug('trellis-monitor:trace');
 
 const fmt = 'YYYY-MM-DD HH:mm:ss.SSS';
 
-const pathTest = async ({ path, oada }: { path: string; oada: OADAClient }): Promise<TestResult> => {
+const pathTest = async ({
+  path,
+  oada,
+}: {
+  path: string;
+  oada: OADAClient;
+}): Promise<TestResult> => {
   try {
     trace(`pathTest: GET ${path}`);
     await oada.get({ path });
-    return { status: 'success' }; // if it doesn't throw, we're good
-  } catch (e) {
-    trace(`pathTest: failed to get path, error = `, e);
+    return { status: 'success' }; // If it doesn't throw, we're good
+  } catch (error: unknown) {
+    trace(error, 'pathTest: failed to get path');
     return {
       status: 'failure',
-      message: `Failed to retrieve path ${path}: ${strError(e)}`,
+      message: `Failed to retrieve path ${path}: ${stringError(error)}`,
     };
   }
 };
@@ -57,10 +63,10 @@ const maxAge = async ({
 }): Promise<TestResult> => {
   try {
     trace(`maxAge: testing rev at ${path} against maxage ${maxage}`);
-    const modified = +(await oada
-      .get({ path: `${path}/_meta/modified` })
-      .then((r) => r.data) || 0) * 1000; // oada has seconds w/ fractional msec
-    const now = +(new Date());
+    const modified =
+      Number((await oada.get({ path: `${path}/_meta/modified` })).data ?? 0) *
+      1000; // OADA has seconds w/ fractional msec
+    const now = Date.now();
     const age = now - modified;
     trace(
       `maxAge: modified = ${modified} msec, now = ${now}, difference = ${age}`
@@ -68,15 +74,18 @@ const maxAge = async ({
     if (age > maxage) {
       return {
         status: 'failure',
-        message: `Age of path ${path} at modified time ${moment(modified).format(fmt)} has age ${age} which is older than maxage ${maxage}`,
+        message: `Age of path ${path} at modified time ${moment(
+          modified
+        ).format(fmt)} has age ${age} which is older than maxage ${maxage}`,
       };
     }
+
     return { status: 'success' };
-  } catch (e) {
+  } catch (error: unknown) {
     return {
       status: 'failure',
-      message: `Failed in retrieving age of path ${path}.  Error was: ${strError(
-        e
+      message: `Failed in retrieving age of path ${path}.  Error was: ${stringError(
+        error
       )}`,
     };
   }
@@ -94,14 +103,17 @@ const relativeAge = async ({
   maxage: number;
 }): Promise<TestResult> => {
   try {
-    trace(`relativeAge: testing age of leader ${leader} vs. follower ${follower} against maxage ${maxage}`);
-    const leadermodified = +(await oada
-      .get({ path: `${leader}/_meta/modified` })
-      .then((r) => r.data) || 0) * 1000;
-    const followermodified = +(await oada
-      .get({ path: `${follower}/_meta/modified` })
-      .then((r) => r.data) || 0) * 1000;
-    const now = +(new Date());
+    trace(
+      `relativeAge: testing age of leader ${leader} vs. follower ${follower} against maxage ${maxage}`
+    );
+    const leadermodified =
+      Number((await oada.get({ path: `${leader}/_meta/modified` })).data ?? 0) *
+      1000;
+    const followermodified =
+      Number(
+        (await oada.get({ path: `${follower}/_meta/modified` })).data ?? 0
+      ) * 1000;
+    const now = Date.now();
 
     // Give the follower a grade period of maxage to figure out what to do before we would
     // consider it an error
@@ -111,24 +123,24 @@ const relativeAge = async ({
     trace(
       `relativeAge: leadermodified = ${leadermodified}, followermodified = ${followermodified}, now = ${now}, now - leader  = ${leaderage}`
     );
-    if (leaderage > maxage && relativeage < 0) { // leader has waited long enough for follower, but follower is still behind
+    if (leaderage > maxage && relativeage < 0) {
+      // Leader has waited long enough for follower, but follower is still behind
       return {
         status: 'failure',
         message: `Waited ${leaderage} msec (maxage ${maxage}) since leader was modified (${leadermodified}), but follower still has not updated (last modified ${followermodified})`,
       };
     }
+
     return { status: 'success' };
-  } catch (e) {
+  } catch (error: unknown) {
     return {
       status: 'failure',
-      message: `Failed in retrieving age of leader or follower.  Error was: ${strError(
-        e
+      message: `Failed in retrieving age of leader or follower.  Error was: ${stringError(
+        error
       )}`,
     };
   }
 };
-
-
 
 const staleKsuidKeys = async ({
   path,
@@ -140,15 +152,20 @@ const staleKsuidKeys = async ({
   oada: OADAClient;
 }): Promise<TestResult> => {
   try {
-    trace(`staleKsuidKeys: testing ${path} against maxage ${maxage}`);
-    const list = await oada.get({ path }).then((r) => r.data);
-    const keys = _.filter(_.keys(list), (k) => !k.match(/^_/));
-    if (keys.length < 0) return { status: 'success' };
+    trace('staleKsuidKeys: testing %s against maxage %d', path, maxAge);
+    const { data: list } = await oada.get({ path });
+    const keys = Object.keys(list as Record<string, unknown>).filter(
+      (k) => !k.startsWith('_')
+    );
+    if (keys.length <= 0) {
+      return { status: 'success' };
+    }
+
     // Otherwise, check the timestamps of all the job key ksuid's
-    const ksuids = _.map(keys, ksuid.parse);
-    trace(`staleKsuidKeys: checking ksuid keys: `, keys);
+    const ksuids = keys.map((key) => ksuid.parse(key));
+    trace('staleKsuidKeys: checking ksuid keys: %s', keys);
     const now = moment().valueOf();
-    const errors = _.filter(ksuids, (t) => {
+    const errors = ksuids.filter((t) => {
       trace(
         `staleKsuidKeys: now ${now} - ksuid date ${t.date.valueOf()} = ${
           now - t.date.valueOf()
@@ -162,17 +179,18 @@ const staleKsuidKeys = async ({
         message: `Had ${
           errors.length
         } ksuid keys beyond maxage of ${maxage}: ${JSON.stringify(
-          _.map(errors, (e) => e.string)
+          errors.map((error) => error.string)
         )}`,
       };
     }
+
     return { status: 'success' };
-  } catch (e) {
-    trace(`staleKsuidKeys: Error thrown from somewhere, e = `, e);
+  } catch (error: unknown) {
+    trace(error, 'staleKsuidKeys: Error thrown from somewhere');
     return {
       status: 'failure',
-      message: `Failed to retrieve list of keys from path ${path}.  Error was: ${strError(
-        e
+      message: `Failed to retrieve list of keys from path ${path}.  Error was: ${stringError(
+        error
       )}`,
     };
   }
@@ -189,6 +207,7 @@ const countKeys = async ({
 }): Promise<TestResult> => {
   try {
     if (index) {
+      // eslint-disable-next-line sonarjs/no-small-switch
       switch (index) {
         case 'day-index':
           path = `${path}/day-index/${moment().format('YYYY-MM-DD')}`;
@@ -200,43 +219,47 @@ const countKeys = async ({
           };
       }
     }
-    const res = await oada.get({ path }).then((r) => r.data);
-    const keys = _.filter(_.keys(res), (k) => !k.match(/^_/));
+
+    const { data: response } = await oada.get({ path });
+    const keys = Object.keys(response as Record<string, unknown>).filter(
+      (k) => !k.startsWith('_')
+    );
     return {
       status: 'success',
       count: keys.length,
     };
-  } catch (e) {
-    if (e.status && e.status === 404) {
-      // today doesn't have an index
+  } catch (error: unknown) {
+    // @ts-expect-error stuff
+    if (error?.status === 404) {
+      // Today doesn't have an index
       return { status: 'success', count: 0 };
     }
+
     return {
       status: 'failure',
-      message: `Failed to count keys from path ${path}.  Error was: ${strError(
-        e
+      message: `Failed to count keys from path ${path}.  Error was: ${stringError(
+        error
       )}`,
     };
   }
 };
 
-function strError(e: {
-  message?: string;
-  status: number;
-  url: string;
-  statusText: string;
-}) {
-  if (!e) {
-    return JSON.stringify(e);
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+function stringError(error: any) {
+  if (!error) {
+    return JSON.stringify(error);
   }
-  if (e.message) {
-    return e.message;
+
+  if (error.message) {
+    return error.message as string;
   }
+
   // The http response objects do not have the things you want to know as enumerable properties:
-  if (e.status) {
-    return `{ url: ${e.url}, status: ${e.status}, statusText: ${e.statusText} }`;
+  if (error.status) {
+    return `{ url: ${error.url}, status: ${error.status}, statusText: ${error.statusText} }`;
   }
-  return JSON.stringify(e, null, '  ');
+
+  return JSON.stringify(error, undefined, '  ');
 }
 
 export { pathTest, maxAge, relativeAge, staleKsuidKeys, countKeys };

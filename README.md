@@ -8,34 +8,38 @@ The schedule looks like a regular cron-style string: `*/15 * * * *` means "every
 `minute hour day_of_month month day_of_week`
 
 There are a set of available "tests" you can run:
-- *maxAge*: alert if a given resource is older than maxage
-- *relativeAge*: alert if a "follower" resource is older than maxage from a "leader" resource
-- *pathTest*: alert if path does not exist or otherwise returns non-2xx code
-- *staleKsuidKeys*: alert if a resource contains any ksuid keys whose timestamp is older than maxage
 
-There are a set of default tests in monitors/default.  You can add additional files
+- _maxAge_: alert if a given resource is older than maxAge
+- _relativeAge_: alert if a "follower" resource is older than maxAge from a "leader" resource
+- _pathTest_: alert if the path does not exist or otherwise returns non-2xx code
+- _staleKsuidKeys_: alert if a resource contains any KSUID keys whose timestamp is older than maxAge
+
+There is a set of default tests in monitors/default. You can add additional files
 to `dist/monitors` and they will be included in the tests run on the cron schedule.
 There are example configs in `examples/`.
 
-If any test fails, alerts are sent to the environment-specified `notifyurl`.  The output
+If any test fails, alerts are sent to the environment-specified `notifyurl`. The output
 is a JSON object containing the status of every test that was run during this interval.
 
-You can also poll the monitor for it's latest results at port 8080 of the service, or if included
-in an oada deployment at `<domain>/trellis-monitor`.  You can trigger a run of the tests
+You can also poll the monitor for its latest results at port 8080 of the service, or if included
+in an OADA deployment at `<domain>/trellis-monitor`. You can trigger a run of the tests
 at `/trellis-monitor/trigger`.
 
 ## Important Configuration
 
 The token required to retrieve the current monitor status from outside is passed
 as an environment variable:
+
 ```bash
 incomingToken="02ioj3flkfs" yarn run start
 ```
-(see additional usage below for local docker or oada deployment)
+
+(see additional usage below for local docker or OADA deployment)
 
 Also, because of nuances w/ modules, you cannot have a test named "default".
 
-## Example set of monitor:
+## Example set of monitor
+
 ```javascript
 module.exports = {
   stale_email_jobs: {
@@ -66,13 +70,13 @@ module.exports = {
   },
 
   jobs_current: {
-    desc: "Is the last modified on the email job queue within 15 mins of asns list?",
+    desc: 'Is the last modified on the email job queue within 15 mins of asns list?',
     type: 'relativeAge',
     params: {
       leader: `/bookmarks/trellisfw/asns`,
       follower: `/bookmarks/services/email/jobs`,
       maxage: 15 * 1000 * 60,
-    }
+    },
   },
 
   count_asns_today: {
@@ -83,25 +87,26 @@ module.exports = {
       index: `day-index`, // tells it to count keys in this known typeof index instead of path
     },
   },
-
 };
 ```
-
 
 ## Usage
 
 To run locally:
+
 ```bash
 yarn run start
 ```
 
 To run locally in docker:
+
 ```bash
 docker-compose up -d
 ```
 
 To run as part of an OADA deployment, just grab the `docker-compose.oada.yml` and
 `support` from the release you want and drop it into your deployment:
+
 ```bash
 cd path/to/your/oada/deployment
 mkdir -p services/trellis-monitor
@@ -110,41 +115,42 @@ curl -L https://github.com/trellisfw/monitor/tarball/v2.0.4 | tar xz
 cp trellisfw-monitor*/docker-compose.oada.yml .
 cp -rf trellisfw-monitor*/support .
 ```
-If using oadadeploy, now run `oadadeploy service refresh`. 
-If not using oadadeploy, put the contents of docker-compose.oada.yml into your docker-compose.yml 
+
+If using oadadeploy, now run `oadadeploy service refresh`.
+If not using oadadeploy, put the contents of docker-compose.oada.yml into your docker-compose.yml
 or docker-compose.override.yml manually.
 
-
-
 - ./support/target-prod.js:/trellisfw/monitor/dist/monitors/target-prod.js
+
 ### docker-compose
 
 ## Configuration
 
 Map in additional monitor spec files as `.js` or `.json` to `dist/monitors` if running locally.
-Map them to `/trellisfw/monitor/dist/monitors` if running in docker or in an oada deployment.
+Map them to `/trellisfw/monitor/dist/monitors` if running in docker or in an OADA deployment.
 
 Available environment variables:
+
 ```yaml
-      # NAME: override oada.domain as the name we report for ourselves in alerts.
-      # TESTS: comma-separated list of patterns of test names to run (non-matches excluded)
-      # TESTS_DIR: override location of monitor spec files to load
-      PORT: 8080
-      NODE_TLS_REJECT_UNAUTHORIZED:
-      NODE_ENV: ${NODE_ENV:-development}
-      DEBUG: ${DEBUG:-*info*,*warn*,*error*}
-      # Optional URL to which to POST on notify
-      notifyurl:
-      # A token require for incoming requests to the monitor
-      incomingToken: foobar
-      # e.g., run every 15 minutes
-      CRON: ${MONITOR_CRON:-*/15 * * * *}
-      # Connect to host if DOMAIN not set.
-      # You should really not rely on this though. Set DOMAIN.
-      DOMAIN: ${DOMAIN:-host.docker.internal}
-      # Unless your API server is running with development tokens enabled,
-      # you will need to give the service a token to use.
-      TOKEN: ${TOKEN:-abc123}
+# NAME: override oada.domain as the name we report for ourselves in alerts.
+# TESTS: comma-separated list of patterns of test names to run (non-matches excluded)
+# TESTS_DIR: override location of monitor spec files to load
+PORT: 8080
+NODE_TLS_REJECT_UNAUTHORIZED:
+NODE_ENV: ${NODE_ENV:-development}
+DEBUG: ${DEBUG:-*info*,*warn*,*error*}
+# Optional URL to which to POST on notify
+notifyurl:
+# A token is required for incoming requests to the monitor
+incomingToken: foobar
+# e.g., run every 15 minutes
+CRON: ${MONITOR_CRON:-*/15 * * * *}
+# Connect to host if DOMAIN is not set.
+# You should really not rely on this though. Set DOMAIN.
+DOMAIN: ${DOMAIN:-host.docker.internal}
+# Unless your API server is running with development tokens enabled,
+# you will need to give the service a token to use.
+TOKEN: ${TOKEN:-abc123}
 ```
 
 [dockerhub]: https://hub.docker.com/repository/docker/trellisfw/monitor

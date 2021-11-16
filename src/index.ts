@@ -1,4 +1,6 @@
-/* Copyright 2021 Qlever LLC
+/**
+ * @license
+ *  Copyright 2021 Qlever LLC
  *
  * Licensed under the Apache License, Version 2.0 (the 'License');
  * you may not use this file except in compliance with the License.
@@ -13,35 +15,34 @@
  * limitations under the License.
  */
 
-import { readdir } from 'fs/promises';
-import { join } from 'path';
+import { join } from 'node:path';
+import { readdir } from 'node:fs/promises';
 
-import Bluebird from 'bluebird';
+import cron from 'node-cron';
 import debug from 'debug';
 import express from 'express';
-import moment from 'moment';
-import cron from 'node-cron';
 import micromatch from 'micromatch';
+import moment from 'moment';
 
-import { connect, OADAClient } from '@oada/client';
+import { OADAClient, connect } from '@oada/client';
 
+// eslint-disable-next-line import/no-namespace
 import * as testers from './testers';
 import type { TestResult as ITestResult } from './testers';
-import * as notifiers from './notifiers';
+import { notifySlack } from './notifiers';
 
 import config from './config';
 
 const error = debug('trellis-monitor:error');
 const info = debug('trellis-monitor:info');
-//const warn = debug('trellis-monitor:warn');
 const trace = debug('trellis-monitor:trace');
 
 const incomingToken = config.get('server.token');
 const port = config.get('server.port');
 const tokenToRequestAgainstOADA = config.get('oada.token');
 let domain = config.get('oada.domain');
-if (!domain.match(/^http/)) {
-  domain = 'https://' + domain;
+if (!domain.startsWith('http')) {
+  domain = `https://${domain}`;
 }
 
 const cronschedule = config.get('notify.cron');
@@ -63,11 +64,11 @@ export interface Test<P = unknown> {
    */
   type: keyof typeof testers;
   /**
-   * domain for this test (optional, defaults to oada.domain in config)
+   * Domain for this test (optional, defaults to oada.domain in config)
    */
   domain?: string;
   /**
-   * token for this test (optional, defaults to oada.token in config)
+   * Token for this test (optional, defaults to oada.token in config)
    */
   token?: string;
   /**
@@ -86,11 +87,8 @@ export interface Status {
     status: 'failure' | 'success';
     lastruntime: string;
   };
-  tests: {
-    [key: string]: TestResult;
-  }
-};
-
+  tests: Record<string, TestResult>;
+}
 
 // Each "final" test that we store will have the oada connection, domain, and token stored in it
 interface ValidTest<P = unknown> {
@@ -106,215 +104,241 @@ interface ValidTest<P = unknown> {
 const testdir = config.get('tests.dir');
 const testmatch = config.get('tests.enabled').split(',');
 
-async function run() {
-  info('Starting monitor with cron = %s', cronschedule);
+info('Starting monitor with cron = %s', cronschedule);
 
+// Is well-known up w/ SSL?
+// Is bookmarks up w/ test token?
+// Any jobs in Target queue w/ update longer than 30 mins ago?
+// asn-staging: if last _rev is more than 5 mins old, and we still have keys in asn-staging, error
+// asn-staging: if last _rev more than 12 hours old, error
+// asns/day-index: count the number of keys today for reporting
+// We will refrain from posting a dummy ASN for now, can use "postOne" if we want to.
 
-  // Is well-known up w/ SSL?
-  // Is bookmarks up w/ test token?
-  // Any jobs in Target queue w/ update longer than 30 mins ago?
-  // asn-staging: if last _rev is more than 5 mins old, and we still have keys in asn-staging, error
-  // asn-staging: if last _rev more than 12 hours old, error
-  // asns/day-index: count the number of keys today for reporting
-  // We will refrain from posting a dummy ASN for now, can use "postOne" if we want to.
+const status: Status = {
+  global: {
+    // Report which server this was?
+    server: notifyname,
+    status: 'failure',
+    lastruntime: 'never',
+  },
+  tests: {},
+};
 
-  const status: Status = {
-    global: {
-      // Report which server this was?
-      server: notifyname,
-      status: 'failure',
-      lastruntime: 'never',
-    },
-    tests: {},
-  };
+// Load monitor tests
+const rawtests: Map<string, Test> = new Map();
+info('Loading all monitor tests from %s', testdir);
+const testfiles = await readdir(testdir);
+for (const t of testfiles) {
+  const file = join(testdir, t);
+  // Load tests from file
+  // eslint-disable-next-line no-await-in-loop
+  const tf = (await import(file)) as Record<string, Test>;
+  trace('Loaded monitor tests %o from %s', Object.keys(tf), file);
 
-  // Load monitor tests
-  const rawtests: Record<string, Test> = {};
-  info('Loading all monitor tests from %s', testdir);
-  const testfiles = await readdir(testdir);
-  for (const t of testfiles) {
-    const file = join(testdir, t);
-    // Load tests from file
-    const tf = (await import(file)) as Record<string, Test>;
-    trace('Loaded monitor tests %o from %s', Object.keys(tf), file);
-
-    // Find any enabled tests
-    const enabled = micromatch(Object.keys(tf), testmatch);
-    trace('Enabling monitor tests %o from %s', enabled, tf);
-    for (const t of enabled) {
-      if (t === 'default') continue; // module.exports in the JS file results in an extra "default" key.  Cannot name a test "default"
-      rawtests[t] = tf[t]!;
+  // Find any enabled tests
+  const enabled = micromatch(Object.keys(tf), testmatch);
+  trace('Enabling monitor tests %o from %s', enabled, tf);
+  for (const te of enabled) {
+    if (te === 'default') {
+      // Module.exports in the JS file results in an extra "default" key.  Cannot name a test "default"
+      continue;
     }
+
+    rawtests.set(te, tf[te]!);
   }
-
-  // Add default domain/token to any tests that do not have it,
-  // and while we're at it open oada connections for all unique domain/token pairs
-  const tests: Record<string, ValidTest> = {};
-  const oadapool: Record<string, OADAClient> = {};
-  for (const key of Object.keys(rawtests)) {
-    const rawtest = rawtests[key]!;
-    const d = rawtest.domain || domain;
-    const t = rawtest.token || tokenToRequestAgainstOADA;
-    const pi = `${d}::${t}`; // index into oada connection pool (same connection for same domain/token)
-    // Do we already have an open connection to this domain/token?
-    if (!oadapool[pi]) {
-      oadapool[pi] = await connect({domain: d, token: t, connection: 'http'})
-        .catch((e: unknown) => {
-          error(`ERROR: failed to connect to OADA for domain ${d} and token ${t}.  Error was: %0`, e);
-          throw e;
-        })
-    }
-    // Create the final set of validated tests w/ included oada connection:
-    tests[key] = {
-      name: key,
-      domain: rawtest.domain || domain, // default to global domain from config
-      token: rawtest.token || tokenToRequestAgainstOADA, // default to token from config
-      ...rawtest,
-      oada: oadapool[pi]!,
-    };
-  }
-
-
-  //-------------------------------------------------------
-  // Trigger testing on a schedule:
-  const check = async () => {
-    try {
-      const testkeys = Object.keys(tests);
-      trace(`Running ${testkeys.length} tests`);
-      let results: TestResult[] = await Bluebird.map(
-        testkeys,
-        async (tk: keyof typeof tests) => {
-          trace('Running test %s', tk);
-          try {
-            const t = tests[tk]!;
-            const runner = testers[t.type];
-            if (!runner) {
-              return { 
-                status: 'failure', 
-                message: `Invalid tester type ${t.type}.  Valid types are: ${Object.keys(testers).join(', ')}` 
-              };
-            }
-            return await runner({
-              oada: t.oada,
-              //@ts-ignore
-              ...t.params,
-            });
-          } catch (e) {
-            error('Test %s threw uncaught exception: %O', tk, e);
-            return {
-              status: 'failure',
-              message: `Uncaught exception: ${e.toString()}`,
-            };
-          }
-        },
-        { concurrency: 1 }
-      );
-
-
-      trace('Results of tests: %O', results);
-      // "status.tests" key should have same keys as tests here, but the values are the results of that test
-      status.tests = testkeys.reduce((acc,tk,index) => ({ 
-        ...acc, 
-        [tk]: results[index] 
-      }), {});
-      // Walk all the tests and augment with description from the test for any failures:
-      for (const testkey of Object.keys(status.tests)) {
-        const result = status.tests[testkey]!;
-        if (status.tests[testkey]!.status === 'success') continue; // leave success tests w/o a desc for brevity
-        if (status.tests[testkey]!.desc) continue; // alrady has a desc from the test itself, leave it alone
-        if (tests[testkey]!.desc) {
-          result.desc = tests[testkey]!.desc; // if there is a desc on the test, include it here
-        }
-      }
-
-          
-      const failures = results.filter(
-        (r: TestResult) => !r.status || r.status !== 'success'
-      );
-      trace('Results filtered to failures = %O', failures);
-      status.global.status = failures.length < 1 ? 'success' : 'failure';
-      status.global.lastruntime = moment().format('YYYY-MM-DD HH:mm:ss');
-
-      if (status.global.status === 'success') {
-        info(`${status.global.lastruntime}: Tests all successful`);
-        return;
-      }
-
-      info('Failure: sending notification.  Failure status is: %O', status);
-      if (notifyurl) {
-        trace("Posting message to config.get('notify.url') = %s", notifyurl);
-        try {
-          notifiers.notifySlack(notifyurl, status);
-        } catch (e) {
-          error('FAILED TO NOTIFY SLACK! Error was: %s', e);
-        }
-      }
-    } catch (e) {
-      error('check: Uncaught error from main check. Error was: %s', e);
-    }
-  };
-  // Run the check immediately on start, then schedule the intervals
-  info('Running initial check');
-  await check();
-  info(
-    'Completed initial check, starting re-check on cron string %s',
-    cronschedule
-  );
-  cron.schedule(cronschedule, check);
-  info('Started monitor');
-
-  //------------------------------------------------------------------------------
-  //
-  // Check the monitor from outside for success:
-  //
-  // Start the express server listening for requests from a monitor:
-  const app = express();
-  //---------------------------------------------------
-  // Ask from outside how things are going:
-  // /trellis-monitor -> return global status from last run of check()
-  app.get('/', async (req, res) => {
-    if (!req || !req.headers) {
-      trace('no headers!');
-      return res.end();
-    }
-    if (req.headers.authorization !== 'Bearer ' + incomingToken) {
-      info('Request for check: Not the right token');
-      return res.end();
-    }
-
-    info(
-      'Responding to request with current global status %O',
-      status.global.status
-    );
-    res.json(status);
-
-    res.end();
-  });
-  // /trellis-monitor/trigger -> run check(), then return global status
-  app.get('/trigger', async (req, res) => {
-    if (!req || !req.headers) {
-      trace('no headers!');
-      return res.end();
-    }
-    if (req.headers.authorization !== 'Bearer ' + incomingToken) {
-      info('Request for check: Not the right token');
-      return res.end();
-    }
-
-    info('trigger: triggering extra run of check() based on request');
-    await check();
-    info(
-      'trigger: Responding to request with current global status %O',
-      status.global.status
-    );
-    res.json(status);
-
-    res.end();
-  });
-
-  // proxy routes https://<domain>/trellis-monitor to us on 80
-  app.listen(port, () => info('@trellisfw/monitor listening on port %d', port));
 }
 
-run();
+// Add default domain/token to any tests that do not have it,
+// and while we're at it open oada connections for all unique domain/token pairs
+const tests: Map<string, ValidTest> = new Map();
+const oadaPool: Map<string, OADAClient> = new Map();
+for (const [key, rawtest] of rawtests) {
+  const d = rawtest.domain ?? domain;
+  const t = rawtest.token ?? tokenToRequestAgainstOADA;
+  const pi = `${d}::${t}`; // Index into oada connection pool (same connection for same domain/token)
+  // Do we already have an open connection to this domain/token?
+  if (!oadaPool.has(pi)) {
+    try {
+      oadaPool.set(
+        pi,
+        // eslint-disable-next-line no-await-in-loop
+        await connect({
+          domain: d,
+          token: t,
+          connection: 'http',
+        })
+      );
+    } catch (cError: unknown) {
+      error(
+        `ERROR: failed to connect to OADA for domain ${d} and token ${t}.  Error was: %0`,
+        cError
+      );
+      throw cError;
+    }
+  }
 
+  // Create the final set of validated tests w/ included oada connection:
+  tests.set(key, {
+    name: key,
+    domain: rawtest.domain ?? domain, // Default to global domain from config
+    token: rawtest.token ?? tokenToRequestAgainstOADA, // Default to token from config
+    ...rawtest,
+    oada: oadaPool.get(pi)!,
+  });
+}
+
+// -------------------------------------------------------
+// Trigger testing on a schedule:
+const check = async () => {
+  try {
+    trace('Running %d tests', tests.size);
+    const results: TestResult[] = [];
+    for (const [tk, t] of tests) {
+      trace('Running test %s', tk);
+      try {
+        // eslint-disable-next-line import/namespace
+        const runner = testers[t.type];
+        if (!runner) {
+          return {
+            status: 'failure',
+            message: `Invalid tester type ${
+              t.type
+            }.  Valid types are: ${Object.keys(testers).join(', ')}`,
+          };
+        }
+
+        results.push(
+          // eslint-disable-next-line no-await-in-loop
+          await runner({
+            oada: t.oada,
+            // @ts-expect-error stuff
+            ...t.params,
+          })
+        );
+      } catch (cError: unknown) {
+        error('Test %s threw uncaught exception: %O', tk, cError);
+        return {
+          status: 'failure',
+          message: `Uncaught exception: ${cError}`,
+        };
+      }
+    }
+
+    trace('Results of tests: %O', results);
+    // "status.tests" key should have same keys as tests here, but the values are the results of that test
+    status.tests = Object.fromEntries(
+      Object.keys(tests).map((tk, index) => [tk, results[Number(index)]!])
+    );
+    // Walk all the tests and augment with description from the test for any failures:
+    for (const [testkey, result] of Object.entries(status.tests)) {
+      if (result.status === 'success') {
+        // Leave success tests w/o a desc for brevity
+        continue;
+      }
+
+      if (result.desc) {
+        // Already has a desc from the test itself, leave it alone
+        continue;
+      }
+
+      if (tests.get(testkey)?.desc) {
+        // If there is a desc on the test, include it here
+        result.desc = tests.get(testkey)?.desc;
+      }
+    }
+
+    const failures = results.filter(
+      (r: TestResult) => !r.status || r.status !== 'success'
+    );
+    trace('Results filtered to failures = %O', failures);
+    status.global.status = failures.length === 0 ? 'success' : 'failure';
+    status.global.lastruntime = moment().format('YYYY-MM-DD HH:mm:ss');
+
+    if (status.global.status === 'success') {
+      info('%s: Tests all successful', status.global.lastruntime);
+      return;
+    }
+
+    info('Failure: sending notification. Failure status is: %O', status);
+    if (notifyurl) {
+      trace("Posting message to config.get('notify.url') = %s", notifyurl);
+      try {
+        await notifySlack(notifyurl, status);
+      } catch (cError: unknown) {
+        error(cError, 'FAILED TO NOTIFY SLACK!');
+      }
+    }
+  } catch (cError: unknown) {
+    error(cError, 'check: Uncaught error from main check');
+  }
+};
+
+// Run the check immediately on start, then schedule the intervals
+info('Running initial check');
+await check();
+info(
+  'Completed initial check, starting re-check on cron string %s',
+  cronschedule
+);
+cron.schedule(cronschedule, check);
+info('Started monitor');
+
+// ------------------------------------------------------------------------------
+//
+// Check the monitor from outside for success:
+//
+// Start the express server listening for requests from a monitor:
+const app = express();
+// ---------------------------------------------------
+// Ask from outside how things are going:
+// /trellis-monitor -> return global status from last run of check()
+app.get('/', async (request, response) => {
+  if (!request || !request.headers) {
+    trace('no headers!');
+    response.end();
+    return;
+  }
+
+  if (request.headers.authorization !== `Bearer ${incomingToken}`) {
+    info('Request for check: Not the right token');
+    response.end();
+    return;
+  }
+
+  info(
+    'Responding to request with current global status %O',
+    status.global.status
+  );
+  response.json(status);
+
+  response.end();
+});
+// /trellis-monitor/trigger -> run check(), then return global status
+app.get('/trigger', async (request, response) => {
+  if (!request || !request.headers) {
+    trace('no headers!');
+    response.end();
+    return;
+  }
+
+  if (request.headers.authorization !== `Bearer ${incomingToken}`) {
+    info('Request for check: Not the right token');
+    response.end();
+    return;
+  }
+
+  info('trigger: triggering extra run of check() based on request');
+  await check();
+  info(
+    'trigger: Responding to request with current global status %O',
+    status.global.status
+  );
+  response.json(status);
+
+  response.end();
+});
+
+// Proxy routes https://<domain>/trellis-monitor to us on 80
+app.listen(port, () => {
+  info('@trellisfw/monitor listening on port %d', port);
+});

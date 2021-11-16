@@ -1,5 +1,4 @@
 services:
-
   # Add our proxy route to nginx
   proxy:
     volumes:

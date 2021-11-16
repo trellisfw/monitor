@@ -1,4 +1,3 @@
-
 module.exports = {
   stale_target_jobs: {
     desc: 'Is target job queue devoid of stale (15-min) jobs?',
@@ -28,13 +27,13 @@ module.exports = {
   },
 
   jobs_current: {
-    desc: "Is the last modified on the target job queue within 15 mins of asns list?",
+    desc: 'Is the last modified on the target job queue within 15 mins of asns list?',
     type: 'relativeAge',
     params: {
       leader: `/bookmarks/trellisfw/asns`,
       follower: `/bookmarks/services/target/jobs`,
       maxage: 15 * 1000 * 60,
-    }
+    },
   },
 
   count_asns_today: {
@@ -45,5 +44,4 @@ module.exports = {
       index: `day-index`, // tells it to count keys in this known typeof index instead of path
     },
   },
-
 };
