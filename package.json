@@ -16,10 +16,13 @@
     "test": "NODE_TLS_REJECT_UNAUTHORIZED=0 mocha"
   },
   "mocha": {
-    "require": "ts-node/register",
     "extension": [
       "ts"
-    ]
+    ],
+    "require": [
+      "ts-node/register"
+    ],
+    "spec": "test/*.test.ts"
   },
   "dependencies": {
     "@oada/client": "^2.6.5",
@@ -32,8 +35,7 @@
     "moment": "^2.29.1",
     "node-cron": "^3.0.0",
     "tiny-json-http": "^7.3.1",
-    "tslib": "^2.3.1",
-    "uuid": "^8.3.2"
+    "tslib": "^2.3.1"
   },
   "devDependencies": {
     "@tsconfig/node16": "^1.0.2",
@@ -46,7 +48,6 @@
     "@types/node": "16.11.13",
     "@types/node-cron": "^3.0.0",
     "@types/tiny-json-http": "^7.3.1",
-    "@types/uuid": "^8.3.3",
     "@typescript-eslint/eslint-plugin": "^5.7.0",
     "@typescript-eslint/parser": "^5.7.0",
     "@yarnpkg/sdks": "^2.5.1-rc.6",

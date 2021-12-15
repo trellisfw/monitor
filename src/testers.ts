@@ -28,6 +28,7 @@ export interface TestResult {
   desc?: string | undefined;
 }
 
+const error = debug('trellis-monitor:error');
 const trace = debug('trellis-monitor:trace');
 
 const fmt = 'YYYY-MM-DD HH:mm:ss.SSS';
@@ -43,11 +44,11 @@ const pathTest = async ({
     trace('pathTest: GET %s', path);
     await oada.get({ path });
     return { status: 'success' }; // If it doesn't throw, we're good
-  } catch (error: unknown) {
-    trace(error, 'pathTest: failed to get path');
+  } catch (cError: unknown) {
+    error(cError, 'pathTest: failed to get path');
     return {
       status: 'failure',
-      message: `Failed to retrieve path ${path}: ${stringError(error)}`,
+      message: `Failed to retrieve path ${path}: ${stringError(cError)}`,
     };
   }
 };
@@ -62,7 +63,7 @@ const maxAge = async ({
   maxage: number;
 }): Promise<TestResult> => {
   try {
-    trace(`maxAge: testing rev at ${path} against maxage ${maxage}`);
+    trace('maxAge: testing rev at %s against maxage %d', path, maxAge);
     const { data } = await oada.get({ path: `${path}/_meta/modified` });
     const modified = Number(data) * 1000; // OADA has seconds w/ fractional msec
     const now = Date.now();
@@ -83,11 +84,12 @@ const maxAge = async ({
     }
 
     return { status: 'success' };
-  } catch (error: unknown) {
+  } catch (cError: unknown) {
+    error(cError, `Failed in retrieving age of path ${path}`);
     return {
       status: 'failure',
-      message: `Failed in retrieving age of path ${path}.  Error was: ${stringError(
-        error
+      message: `Failed in retrieving age of path ${path}. Error was: ${stringError(
+        cError
       )}`,
     };
   }
@@ -142,11 +144,12 @@ const relativeAge = async ({
     }
 
     return { status: 'success' };
-  } catch (error: unknown) {
+  } catch (cError: unknown) {
+    error(cError, 'Failed in retrieving age of leader or follower');
     return {
       status: 'failure',
-      message: `Failed in retrieving age of leader or follower.  Error was: ${stringError(
-        error
+      message: `Failed in retrieving age of leader or follower. Error was: ${stringError(
+        cError
       )}`,
     };
   }
@@ -190,18 +193,18 @@ const staleKsuidKeys = async ({
         message: `Had ${
           errors.length
         } ksuid keys beyond maxage of ${maxage}: ${JSON.stringify(
-          errors.map((error) => error.string)
+          errors.map((aError) => aError.string)
         )}`,
       };
     }
 
     return { status: 'success' };
-  } catch (error: unknown) {
-    trace(error, 'staleKsuidKeys: Error thrown from somewhere');
+  } catch (cError: unknown) {
+    error(cError, 'staleKsuidKeys: Error thrown from somewhere');
     return {
       status: 'failure',
-      message: `Failed to retrieve list of keys from path ${path}.  Error was: ${stringError(
-        error
+      message: `Failed to retrieve list of keys from path ${path}. Error was: ${stringError(
+        cError
       )}`,
     };
   }
@@ -239,38 +242,40 @@ const countKeys = async ({
       status: 'success',
       count: keys.length,
     };
-  } catch (error: unknown) {
+  } catch (cError: unknown) {
     // @ts-expect-error stuff
-    if (error?.status === 404) {
+    if (cError?.status === 404) {
       // Today doesn't have an index
       return { status: 'success', count: 0 };
     }
 
+    error(cError, `Failed to count of keys from path ${path}`);
     return {
       status: 'failure',
-      message: `Failed to count keys from path ${path}.  Error was: ${stringError(
-        error
+      message: `Failed to count keys from path ${path}. Error was: ${stringError(
+        cError
       )}`,
     };
   }
 };
 
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-function stringError(error: any) {
-  if (!error) {
-    return JSON.stringify(error);
+function stringError(aError: unknown) {
+  if (typeof aError !== 'object' || !aError) {
+    return JSON.stringify(aError);
   }
 
-  if (error.message) {
-    return error.message as string;
+  if ('message' in aError) {
+    // @ts-expect-error stupid error checks
+    return aError.message as string;
   }
 
   // The http response objects do not have the things you want to know as enumerable properties:
-  if (error.status) {
-    return `{ url: ${error.url}, status: ${error.status}, statusText: ${error.statusText} }`;
+  if ('status' in aError) {
+    // @ts-expect-error stupid error checks
+    return `{ url: ${aError.url}, status: ${aError.status}, statusText: ${aError.statusText} }`;
   }
 
-  return JSON.stringify(error, undefined, '  ');
+  return JSON.stringify(aError, undefined, '  ');
 }
 
 export { pathTest, maxAge, relativeAge, staleKsuidKeys, countKeys };

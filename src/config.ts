@@ -69,11 +69,18 @@ const config = convict({
       env: 'notifyurl',
     },
     cron: {
-      doc: 'Cron format of when to notify',
+      doc: 'Cron format of when to notify of _new_ issues',
       format: String,
       // Every 15 minutes
       default: '*/15 * * * *',
       env: 'CRON',
+    },
+    reminderCron: {
+      doc: 'Cron format of when to notify of all existing issues',
+      format: String,
+      // Remind once a day at midnight?
+      default: '0 0 * * *',
+      env: 'REMINDER_CRON',
     },
   },
   // TODO: IDK what this is

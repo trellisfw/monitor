@@ -68,9 +68,6 @@ export const notifySlack = async (notifyurl: string, status: unknown) => {
     });
     info('notifySlack: Successfully posted status to slack');
   } catch (cError: unknown) {
-    error(
-      'finishReporters#slack: ERROR: failed to post message to slack!  Error was: ',
-      cError
-    );
+    error(cError, 'finishReporters#slack: failed to post message to slack!');
   }
 };

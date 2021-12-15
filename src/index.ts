@@ -45,9 +45,10 @@ if (!domain.startsWith('http')) {
   domain = `https://${domain}`;
 }
 
-const cronschedule = config.get('notify.cron');
+const notifyCron = config.get('notify.cron');
+const reminderCron = config.get('notify.reminderCron');
 const notifyurl = config.get('notify.url');
-const notifyname = config.get('notify.name') || config.get('oada.domain');
+const notifyname = config.get('notify.name') ?? config.get('oada.domain');
 
 /**
  * The format of a test description
@@ -104,7 +105,7 @@ interface ValidTest<P = unknown> {
 const testdir = config.get('tests.dir');
 const testmatch = config.get('tests.enabled').split(',');
 
-info('Starting monitor with cron = %s', cronschedule);
+info('Starting monitor with cron = %s', notifyCron);
 
 // Is well-known up w/ SSL?
 // Is bookmarks up w/ test token?
@@ -123,6 +124,7 @@ const status: Status = {
   },
   tests: {},
 };
+const failures: Map<string, TestResult> = new Map();
 
 // Load monitor tests
 const rawtests: Map<string, Test> = new Map();
@@ -132,19 +134,21 @@ for (const t of testfiles) {
   const file = join(testdir, t);
   // Load tests from file
   // eslint-disable-next-line no-await-in-loop
-  const tf = (await import(file)) as Record<string, Test>;
-  trace('Loaded monitor tests %o from %s', Object.keys(tf), file);
+  const testsFile = (await import(file)) as Record<string, Test>;
+  const tests = Object.keys(testsFile);
+  trace('Loaded monitor tests %o from %s', tests, file);
 
   // Find any enabled tests
-  const enabled = micromatch(Object.keys(tf), testmatch);
-  trace('Enabling monitor tests %o from %s', enabled, tf);
+  const enabled = micromatch(tests, testmatch);
+  trace('Enabling monitor tests %o from %s', enabled, testsFile);
   for (const te of enabled) {
     if (te === 'default') {
       // Module.exports in the JS file results in an extra "default" key.  Cannot name a test "default"
       continue;
     }
 
-    rawtests.set(te, tf[te]!);
+    // eslint-disable-next-line security/detect-object-injection
+    rawtests.set(te, testsFile[te]!);
   }
 }
 
@@ -165,14 +169,10 @@ for (const [key, rawtest] of rawtests) {
         await connect({
           domain: d,
           token: t,
-          connection: 'http',
         })
       );
     } catch (cError: unknown) {
-      error(
-        cError,
-        `ERROR: failed to connect to OADA for domain ${d} and token ${t}.  Error was: %0`
-      );
+      error(cError, `Failed to connect to OADA for domain ${d} and token ${t}`);
       throw cError;
     }
   }
@@ -189,10 +189,17 @@ for (const [key, rawtest] of rawtests) {
 
 // -------------------------------------------------------
 // Trigger testing on a schedule:
-const check = async () => {
+let checking = false; // Prevent concurrent check runs?
+const check = async (exclude: readonly string[] = []) => {
+  if (checking) {
+    // Check is already running
+    return;
+  }
+
   try {
+    checking = true;
     trace('Running %d tests', tests.size);
-    const results: TestResult[] = [];
+    const results: Map<string, TestResult> = new Map();
     for (const [tk, t] of tests) {
       trace('Running test %s', tk);
       try {
@@ -207,7 +214,8 @@ const check = async () => {
           };
         }
 
-        results.push(
+        results.set(
+          tk,
           // eslint-disable-next-line no-await-in-loop
           await runner({
             oada: t.oada,
@@ -216,7 +224,7 @@ const check = async () => {
           })
         );
       } catch (cError: unknown) {
-        error('Test %s threw uncaught exception: %O', tk, cError);
+        error(cError, `Test ${tk} threw an uncaught exception`);
         return {
           status: 'failure',
           message: `Uncaught exception: ${cError}`,
@@ -227,7 +235,7 @@ const check = async () => {
     trace(results, 'Results of tests');
     // "status.tests" key should have same keys as tests here, but the values are the results of that test
     status.tests = Object.fromEntries(
-      Object.keys(tests).map((tk, index) => [tk, results[Number(index)]!])
+      Object.keys(tests).map((tk) => [tk, results.get(tk)!])
     );
     // Walk all the tests and augment with description from the test for any failures:
     for (const [testkey, result] of Object.entries(status.tests)) {
@@ -236,22 +244,25 @@ const check = async () => {
         continue;
       }
 
-      if (result.desc) {
+      if ('desc' in result) {
         // Already has a desc from the test itself, leave it alone
         continue;
       }
 
-      if (tests.get(testkey)?.desc) {
-        // If there is a desc on the test, include it here
-        result.desc = tests.get(testkey)?.desc;
+      // If there is a desc on the test, include it here
+      result.desc = tests.get(testkey)?.desc;
+    }
+
+    // Find failing tests
+    failures.clear();
+    for (const [tk, r] of results) {
+      if (r.status !== 'success') {
+        failures.set(tk, r);
       }
     }
 
-    const failures = results.filter(
-      (r: TestResult) => !r.status || r.status !== 'success'
-    );
     trace(failures, 'Results filtered to failures');
-    status.global.status = failures.length === 0 ? 'success' : 'failure';
+    status.global.status = failures.size === 0 ? 'success' : 'failure';
     status.global.lastruntime = moment().format('YYYY-MM-DD HH:mm:ss');
 
     if (status.global.status === 'success') {
@@ -259,17 +270,21 @@ const check = async () => {
       return;
     }
 
-    info('Failure: sending notification. Failure status is: %O', status);
+    info(status, 'Failure: sending notification.');
     if (notifyurl) {
       trace("Posting message to config.get('notify.url') = %s", notifyurl);
       try {
-        await notifySlack(notifyurl, status);
+        if (Array.from(failures.keys()).some((tk) => !exclude.includes(tk))) {
+          await notifySlack(notifyurl, status);
+        }
       } catch (cError: unknown) {
         error(cError, 'FAILED TO NOTIFY SLACK!');
       }
     }
   } catch (cError: unknown) {
     error(cError, 'check: Uncaught error from main check');
+  } finally {
+    checking = false;
   }
 };
 
@@ -278,9 +293,11 @@ info('Running initial check');
 await check();
 info(
   'Completed initial check, starting re-check on cron string %s',
-  cronschedule
+  notifyCron
 );
-cron.schedule(cronschedule, check);
+
+cron.schedule(notifyCron, async () => check(Array.from(failures.keys())));
+cron.schedule(reminderCron, check);
 info('Started monitor');
 
 // ------------------------------------------------------------------------------
@@ -293,7 +310,7 @@ const app = express();
 // Ask from outside how things are going:
 // /trellis-monitor -> return global status from last run of check()
 app.get('/', async (request, response) => {
-  if (!request || !request.headers) {
+  if (!request?.headers) {
     trace('no headers!');
     response.end();
     return;
@@ -306,8 +323,8 @@ app.get('/', async (request, response) => {
   }
 
   info(
-    'Responding to request with current global status %O',
-    status.global.status
+    status.global.status,
+    'Responding to request with current global status'
   );
   response.json(status);
 
@@ -315,7 +332,7 @@ app.get('/', async (request, response) => {
 });
 // /trellis-monitor/trigger -> run check(), then return global status
 app.get('/trigger', async (request, response) => {
-  if (!request || !request.headers) {
+  if (!request?.headers) {
     trace('no headers!');
     response.end();
     return;
@@ -330,8 +347,8 @@ app.get('/trigger', async (request, response) => {
   info('trigger: triggering extra run of check() based on request');
   await check();
   info(
-    'trigger: Responding to request with current global status %O',
-    status.global.status
+    status.global.status,
+    'trigger: Responding to request with current global status'
   );
   response.json(status);
 
