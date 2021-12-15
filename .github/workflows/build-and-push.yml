@@ -26,6 +26,7 @@ jobs:
       dockerhub_repo: ${{ secrets.DOCKER_REPO }}
       snyk_org: ${{ secrets.SNYK_ORG }}
       # Actual secrets
-      github_token: ${{ secrets.GITHUB_TOKEN }}
       dockerhub_token: ${{ secrets.DOCKERHUB_TOKEN }}
       snyk_token: ${{ secrets.SNYK_TOKEN }}
+      cosign_key: ${{ secrets.COSIGN_KEY }}
+      cosign_password: ${{ secrets.COSIGN_PASSWORD }}
