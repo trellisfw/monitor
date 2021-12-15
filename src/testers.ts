@@ -40,7 +40,7 @@ const pathTest = async ({
   oada: OADAClient;
 }): Promise<TestResult> => {
   try {
-    trace(`pathTest: GET ${path}`);
+    trace('pathTest: GET %s', path);
     await oada.get({ path });
     return { status: 'success' }; // If it doesn't throw, we're good
   } catch (error: unknown) {
@@ -63,13 +63,15 @@ const maxAge = async ({
 }): Promise<TestResult> => {
   try {
     trace(`maxAge: testing rev at ${path} against maxage ${maxage}`);
-    const modified =
-      Number((await oada.get({ path: `${path}/_meta/modified` })).data ?? 0) *
-      1000; // OADA has seconds w/ fractional msec
+    const { data } = await oada.get({ path: `${path}/_meta/modified` });
+    const modified = Number(data) * 1000; // OADA has seconds w/ fractional msec
     const now = Date.now();
     const age = now - modified;
     trace(
-      `maxAge: modified = ${modified} msec, now = ${now}, difference = ${age}`
+      'maxAge: modified = %d msec, now = %d, difference = %d',
+      modified,
+      now,
+      age
     );
     if (age > maxage) {
       return {
@@ -104,15 +106,19 @@ const relativeAge = async ({
 }): Promise<TestResult> => {
   try {
     trace(
-      `relativeAge: testing age of leader ${leader} vs. follower ${follower} against maxage ${maxage}`
+      'relativeAge: testing age of leader %s vs. follower %s against maxage %d',
+      leader,
+      follower,
+      maxage
     );
-    const leadermodified =
-      Number((await oada.get({ path: `${leader}/_meta/modified` })).data ?? 0) *
-      1000;
-    const followermodified =
-      Number(
-        (await oada.get({ path: `${follower}/_meta/modified` })).data ?? 0
-      ) * 1000;
+    const { data: leaderData } = await oada.get({
+      path: `${leader}/_meta/modified`,
+    });
+    const leadermodified = Number(leaderData) * 1000;
+    const { data: followerData } = await oada.get({
+      path: `${follower}/_meta/modified`,
+    });
+    const followermodified = Number(followerData) * 1000;
     const now = Date.now();
 
     // Give the follower a grade period of maxage to figure out what to do before we would
@@ -121,7 +127,11 @@ const relativeAge = async ({
     const relativeage = followermodified - leadermodified;
 
     trace(
-      `relativeAge: leadermodified = ${leadermodified}, followermodified = ${followermodified}, now = ${now}, now - leader  = ${leaderage}`
+      'relativeAge: leadermodified = %d, followermodified = %d, now = %d, now - leader  = %d',
+      leadermodified,
+      followermodified,
+      now,
+      leaderage
     );
     if (leaderage > maxage && relativeage < 0) {
       // Leader has waited long enough for follower, but follower is still behind
@@ -167,9 +177,10 @@ const staleKsuidKeys = async ({
     const now = moment().valueOf();
     const errors = ksuids.filter((t) => {
       trace(
-        `staleKsuidKeys: now ${now} - ksuid date ${t.date.valueOf()} = ${
-          now - t.date.valueOf()
-        }`
+        'staleKsuidKeys: now %d - ksuid date %d = %d',
+        now,
+        t.date.valueOf(),
+        now - t.date.valueOf()
       );
       return now - t.date.valueOf() > maxage * 1000;
     });

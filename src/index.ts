@@ -170,8 +170,8 @@ for (const [key, rawtest] of rawtests) {
       );
     } catch (cError: unknown) {
       error(
-        `ERROR: failed to connect to OADA for domain ${d} and token ${t}.  Error was: %0`,
-        cError
+        cError,
+        `ERROR: failed to connect to OADA for domain ${d} and token ${t}.  Error was: %0`
       );
       throw cError;
     }
@@ -224,7 +224,7 @@ const check = async () => {
       }
     }
 
-    trace('Results of tests: %O', results);
+    trace(results, 'Results of tests');
     // "status.tests" key should have same keys as tests here, but the values are the results of that test
     status.tests = Object.fromEntries(
       Object.keys(tests).map((tk, index) => [tk, results[Number(index)]!])
@@ -250,7 +250,7 @@ const check = async () => {
     const failures = results.filter(
       (r: TestResult) => !r.status || r.status !== 'success'
     );
-    trace('Results filtered to failures = %O', failures);
+    trace(failures, 'Results filtered to failures');
     status.global.status = failures.length === 0 ? 'success' : 'failure';
     status.global.lastruntime = moment().format('YYYY-MM-DD HH:mm:ss');
 
