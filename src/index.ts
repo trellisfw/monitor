@@ -27,11 +27,11 @@ import moment from 'moment';
 import { OADAClient, connect } from '@oada/client';
 
 // eslint-disable-next-line import/no-namespace
-import * as testers from './testers';
-import type { TestResult as ITestResult } from './testers';
-import { notifySlack } from './notifiers';
+import * as testers from './testers.js';
+import type { TestResult as ITestResult } from './testers.js';
+import { notifySlack } from './notifiers.js';
 
-import config from './config';
+import config from './config.js';
 
 const error = debug('trellis-monitor:error');
 const info = debug('trellis-monitor:info');
