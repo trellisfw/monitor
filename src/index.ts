@@ -132,9 +132,17 @@ info('Loading all monitor tests from %s', testdir);
 const testfiles = await readdir(testdir);
 for (const t of testfiles) {
   const file = join(testdir, t);
+
   // Load tests from file
-  // eslint-disable-next-line no-await-in-loop
-  const testsFile = (await import(file)) as Record<string, Test>;
+  let testsFile: Record<string, Test>;
+  try {
+    // eslint-disable-next-line no-await-in-loop
+    testsFile = (await import(file)) as Record<string, Test>;
+  } catch {
+    // eslint-disable-next-line no-await-in-loop
+    testsFile = (await import(join(file, 'index.js'))) as Record<string, Test>;
+  }
+
   const tests = Object.keys(testsFile);
   trace('Loaded monitor tests %o from %s', tests, file);
 
@@ -203,7 +211,6 @@ const check = async (exclude: readonly string[] = []) => {
     for (const [tk, t] of tests) {
       trace('Running test %s', tk);
       try {
-        // eslint-disable-next-line import/namespace
         const runner = testers[t.type];
         if (!runner) {
           return {
