@@ -144,11 +144,11 @@ for (const t of testfiles) {
   }
 
   const tests = Object.keys(testsFile);
-  trace('Loaded monitor tests %o from %s', tests, file);
+  trace('Loaded monitor tests %O from %s', tests, file);
 
   // Find any enabled tests
   const enabled = micromatch(tests, testmatch);
-  trace('Enabling monitor tests %o from %s', enabled, testsFile);
+  trace('Enabling monitor tests %O from %s', enabled, testsFile);
   for (const te of enabled) {
     if (te === 'default') {
       // Module.exports in the JS file results in an extra "default" key.  Cannot name a test "default"
