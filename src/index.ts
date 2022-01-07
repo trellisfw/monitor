@@ -48,7 +48,7 @@ if (!domain.startsWith('http')) {
 const notifyCron = config.get('notify.cron');
 const reminderCron = config.get('notify.reminderCron');
 const notifyurl = config.get('notify.url');
-const notifyname = config.get('notify.name') ?? config.get('oada.domain');
+const notifyname = config.get('notify.name') || config.get('oada.domain');
 
 /**
  * The format of a test description
@@ -181,7 +181,7 @@ for (const [key, rawtest] of rawtests) {
       );
     } catch (cError: unknown) {
       error(cError, `Failed to connect to OADA for domain ${d} and token ${t}`);
-      throw cError;
+      throw cError as Error;
     }
   }
 
@@ -242,7 +242,7 @@ const check = async (exclude: readonly string[] = []) => {
     trace(results, 'Results of tests');
     // "status.tests" key should have same keys as tests here, but the values are the results of that test
     status.tests = Object.fromEntries(
-      Object.keys(tests).map((tk) => [tk, results.get(tk)!])
+      Array.from(tests.keys(), (tk) => [tk, results.get(tk)!])
     );
     // Walk all the tests and augment with description from the test for any failures:
     for (const [testkey, result] of Object.entries(status.tests)) {
@@ -304,7 +304,7 @@ info(
 );
 
 cron.schedule(notifyCron, async () => check(Array.from(failures.keys())));
-cron.schedule(reminderCron, check);
+cron.schedule(reminderCron, async () => check());
 info('Started monitor');
 
 // ------------------------------------------------------------------------------

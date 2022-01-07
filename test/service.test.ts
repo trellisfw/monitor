@@ -99,7 +99,7 @@ describe('service', () => {
       // @ts-expect-error errors are annoying
       if (error.code !== 'ECONNREFUSED') {
         // Service is running, but something went wrong
-        throw error;
+        throw error as Error;
       }
 
       trace('Service does not appear to be running, skipping this test');
