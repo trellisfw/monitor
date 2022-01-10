@@ -1,6 +1,6 @@
 {
   "name": "@trellisfw/monitor",
-  "version": "2.1.0",
+  "version": "2.1.1",
   "description": "A Trellis microservice to respond to monitor pings, spawn and check things internally, and respond with success or fail",
   "main": "dist/index.js",
   "type": "module",
