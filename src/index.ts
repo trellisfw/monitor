@@ -198,7 +198,7 @@ for (const [key, rawtest] of rawtests) {
 // -------------------------------------------------------
 // Trigger testing on a schedule:
 let checking = false; // Prevent concurrent check runs?
-const check = async (exclude: readonly string[] = []) => {
+const check = async (quiet: readonly string[] = []) => {
   if (checking) {
     // Check is already running
     return;
@@ -208,7 +208,7 @@ const check = async (exclude: readonly string[] = []) => {
     checking = true;
     trace('Running %d tests', tests.size);
     const results: Map<string, TestResult> = new Map();
-    for (const [tk, t] of tests) {
+    for await (const [tk, t] of tests) {
       trace('Running test %s', tk);
       try {
         const runner = testers[t.type];
@@ -223,7 +223,6 @@ const check = async (exclude: readonly string[] = []) => {
 
         results.set(
           tk,
-          // eslint-disable-next-line no-await-in-loop
           await runner({
             oada: t.oada,
             // @ts-expect-error stuff
@@ -281,7 +280,7 @@ const check = async (exclude: readonly string[] = []) => {
     if (notifyurl) {
       trace("Posting message to config.get('notify.url') = %s", notifyurl);
       try {
-        if (Array.from(failures.keys()).some((tk) => !exclude.includes(tk))) {
+        if (Array.from(failures.keys()).some((tk) => !quiet.includes(tk))) {
           await notifySlack(notifyurl, status);
         }
       } catch (cError: unknown) {
