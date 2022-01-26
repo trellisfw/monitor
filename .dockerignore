@@ -21,6 +21,7 @@
 **/.undodir
 
 # Built TS etc.
+**/.test
 **/dist
 **/*.tsbuildinfo
 

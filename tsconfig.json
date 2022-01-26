@@ -1,6 +1,12 @@
 {
   "extends": "@tsconfig/node16",
+  "ts-node": {
+    "compilerOptions": {
+      "rootDir": "."
+    }
+  },
   "compilerOptions": {
+    "composite": true,
     "module": "esnext",
     "moduleResolution": "node",
     "removeComments": true,

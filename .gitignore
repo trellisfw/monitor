@@ -9,6 +9,7 @@ package.lock
 # TypeScript
 dist
 *.tsbuildinfo
+.test
 
 # Docker overrides
 docker-compose.override.yml

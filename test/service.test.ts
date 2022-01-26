@@ -15,25 +15,18 @@
  * limitations under the License.
  */
 
-import { setTimeout } from 'node:timers/promises';
+import test from 'ava';
 
-import debug from 'debug';
-import { expect } from 'chai';
 import ksuid from 'ksuid';
 import tiny from 'tiny-json-http';
 
 import { OADAClient, connect } from '@oada/client';
 
-import config from '../src/config';
-
-const log = debug('trellis-monitor:debug');
-const trace = debug('trellis-monitor:trace');
+import config from '../dist/config.js';
 
 const domain = config.get('oada.domain');
 const token = config.get('oada.token');
 const incomingToken = config.get('server.token');
-
-trace('Connecting to oada w/ domain = %s and token = %s', domain, token);
 
 const tree = {
   bookmarks: {
@@ -62,81 +55,73 @@ const tree = {
 // In watch mode, these tests need to wait for service to restart.  package.json adds `--delay` to
 // mocha in this case: it will wait to run our tests until we call "run".  Code for that is at bottom.
 
-describe('service', () => {
-  let oada: OADAClient;
-  before(async () => {
-    oada = await connect({ domain, token, connection: 'http' });
-    // Setup the trees that it is expecting to be there
-    await ensurePath(`/bookmarks/trellisfw/asn-staging`, oada);
-    await ensurePath(`/bookmarks/trellisfw/asns`, oada);
-    await ensurePath(`/bookmarks/services/target/jobs`, oada);
-  });
+let oada: OADAClient;
+test.before(async (t) => {
+  oada = await connect({ domain, token, connection: 'http' });
+  // Setup the trees that it is expecting to be there
+  await ensurePath(`/bookmarks/trellisfw/asn-staging`, oada);
+  await ensurePath(`/bookmarks/trellisfw/asns`, oada);
+  await ensurePath(`/bookmarks/services/target/jobs`, oada);
 
-  it('should fail on check after posting stale asn-staging ksuid key', async () => {
-    const { string: oldKSUID } = await ksuid.random(
-      new Date('2021-02-03T01:00:00Z')
-    );
-    const path = `/bookmarks/trellisfw/asn-staging`;
-    await oada.put({
-      path,
-      data: { [oldKSUID]: { istest: true } },
-      contentType: 'application/json',
-    });
-    const url = `http://localhost:${config.get('server.port')}/trigger`;
-    trace('Getting trigger at url ', url);
-
-    let serviceIsRunning = false;
-    let status: unknown = '';
+  async function ensurePath(path: string, oada: OADAClient) {
     try {
-      const response = await tiny.get({
-        url,
-        headers: { authorization: `Bearer ${incomingToken}` },
-      });
-      serviceIsRunning = true;
-      status = response?.body?.tests?.staging_clean?.status;
-      trace('Done w/ trigger, checking body: ', response.body);
+      await oada.head({ path });
     } catch (error: unknown) {
       // @ts-expect-error errors are annoying
-      if (error.code !== 'ECONNREFUSED') {
-        // Service is running, but something went wrong
-        throw error as Error;
+      if (error.status === 404) {
+        t.log(`ensurePath: path ${path} did not exist before test, creating`);
+        await oada.put({ path, tree, data: {} });
+        return;
       }
 
-      trace('Service does not appear to be running, skipping this test');
-      serviceIsRunning = false; // Service isn't running, test is irrelevant
+      t.log(
+        `ERROR: ensurePath: HEAD to path ${path} returned non-404 error status:`,
+        error
+      );
     }
-
-    // Cleanup the stale ksuid before testing:
-    await oada.delete({ path: `${path}/${oldKSUID}` });
-    // Only perform the expectation if service is actually running:
-    if (serviceIsRunning) {
-      expect(status).to.equal('failure');
-    }
-  });
+  }
 });
 
-async function ensurePath(path: string, oada: OADAClient) {
+test('should fail on check after posting stale asn-staging ksuid key', async (t) => {
+  const { string: oldKSUID } = await ksuid.random(
+    new Date('2021-02-03T01:00:00Z')
+  );
+  const path = `/bookmarks/trellisfw/asn-staging`;
+  await oada.put({
+    path,
+    data: { [oldKSUID]: { istest: true } },
+    contentType: 'application/json',
+  });
+  const url = `http://localhost:${config.get('server.port')}/trigger`;
+  t.log('Getting trigger at url ', url);
+
+  let serviceIsRunning = false;
+  let status: unknown = '';
   try {
-    await oada.head({ path });
+    const response = await tiny.get({
+      url,
+      headers: { authorization: `Bearer ${incomingToken}` },
+    });
+    serviceIsRunning = true;
+    status = response?.body?.tests?.staging_clean?.status;
+    t.log('Done w/ trigger, checking body: ', response.body);
   } catch (error: unknown) {
     // @ts-expect-error errors are annoying
-    if (error.status === 404) {
-      log(`ensurePath: path ${path} did not exist before test, creating`);
-      await oada.put({ path, tree, data: {} });
-      return;
+    if (error.code !== 'ECONNREFUSED') {
+      // Service is running, but something went wrong
+      throw error as Error;
     }
 
-    log(
-      `ERROR: ensurePath: HEAD to path ${path} returned non-404 error status:`,
-      error
-    );
+    t.log('Service does not appear to be running, skipping this test');
+    serviceIsRunning = false; // Service isn't running, test is irrelevant
   }
-}
 
-if (run) {
-  log('--delay passed, waiting 2 seconds before starting service tests');
-  // @ts-expect-error this is a module
-  await setTimeout(2000);
-  log('Done waiting, starting service tests');
-  run();
-}
+  // Cleanup the stale ksuid before testing:
+  await oada.delete({ path: `${path}/${oldKSUID}` });
+  // Only perform the expectation if service is actually running:
+  if (serviceIsRunning) {
+    t.is(status, 'failure');
+  }
+
+  t.pass();
+});
