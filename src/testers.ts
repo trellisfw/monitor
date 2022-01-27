@@ -63,7 +63,7 @@ const maxAge = async ({
   maxage: number;
 }): Promise<TestResult> => {
   try {
-    trace('maxAge: testing rev at %s against maxage %d', path, maxAge);
+    trace('maxAge: testing rev at %s against maxage %d', path, maxage);
     const { data } = await oada.get({ path: `${path}/_meta/modified` });
     const modified = Number(data) * 1000; // OADA has seconds w/ fractional msec
     const now = Date.now();
@@ -165,7 +165,8 @@ const staleKsuidKeys = async ({
   oada: OADAClient;
 }): Promise<TestResult> => {
   try {
-    trace('staleKsuidKeys: testing %s against maxage %d', path, maxAge);
+    const now = Date.now();
+    trace('staleKsuidKeys: testing %s against maxage %d', path, maxage);
     const { data: list } = await oada.get({ path });
     const keys = Object.keys(list as Record<string, unknown>).filter(
       (k) => !k.startsWith('_')
@@ -174,10 +175,9 @@ const staleKsuidKeys = async ({
       return { status: 'success' };
     }
 
-    // Otherwise, check the timestamps of all the job key ksuid's
+    // Otherwise, check the timestamps of all the job key KSUIDs
     const ksuids = keys.map((key) => ksuid.parse(key));
     trace('staleKsuidKeys: checking ksuid keys: %s', keys);
-    const now = moment().valueOf();
     const errors = ksuids.filter((t) => {
       trace(
         'staleKsuidKeys: now %d - ksuid date %d = %d',

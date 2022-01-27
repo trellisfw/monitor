@@ -30,38 +30,53 @@ const token = config.get('oada.token');
 
 let oada: OADAClient;
 
-const path = `/resources/TRELLIS-MONITOR-TEST-${ksuid.randomSync().string}`;
-const newKSUID = ksuid.randomSync().string;
-const oldKSUID = ksuid.randomSync(new Date('2021-02-03T01:00:00Z')).string;
 test.before(async () => {
   oada = await connect({ domain, token, connection: 'http' });
-  await oada.put({ path, data: {}, contentType: 'application/json' });
-  await setTimeout(1001); // Wait 1 s should be sufficient to test age
 });
 
 test.after(async () => {
-  await oada?.delete({ path });
   await oada?.disconnect();
 });
 
 test('should have status: success for resource w/ recent ksuid key', async (t) => {
-  await oada.put({
-    path,
-    data: { [newKSUID]: true },
-    contentType: 'application/json',
-  });
-  const result = await staleKsuidKeys({ path, maxage: 60, oada });
-  await oada.delete({ path: `${path}/newksuid` });
-  t.deepEqual(result, { status: 'success' });
+  const path = `/resources/TRELLIS-MONITOR-TEST-${ksuid.randomSync().string}`;
+  try {
+    await oada.put({ path, data: {}, contentType: 'application/json' });
+
+    await setTimeout(1001); // Wait 1 s should be sufficient to test age
+
+    const { string: newKSUID } = await ksuid.random();
+    await oada.put({
+      path,
+      data: { [newKSUID]: true },
+      contentType: 'application/json',
+    });
+    const result = await staleKsuidKeys({ path, maxage: 60, oada });
+    await oada.delete({ path: `${path}/${newKSUID}` });
+    t.deepEqual(result, { status: 'success' });
+  } finally {
+    await oada?.delete({ path });
+  }
 });
 
 test('should have status: failure for resource w/ old ksuid key', async (t) => {
-  await oada.put({
-    path,
-    data: { [oldKSUID]: true },
-    contentType: 'application/json',
-  });
-  const result = await staleKsuidKeys({ path, maxage: 1, oada });
-  await oada.delete({ path: `${path}/oldksuid` });
-  t.is(result.status, 'failure');
+  const path = `/resources/TRELLIS-MONITOR-TEST-${ksuid.randomSync().string}`;
+  try {
+    oada = await connect({ domain, token, connection: 'http' });
+    await oada.put({ path, data: {}, contentType: 'application/json' });
+    const { string: oldKSUID } = await ksuid.random(
+      new Date('2021-02-03T01:00:00Z')
+    );
+
+    await oada.put({
+      path,
+      data: { [oldKSUID]: true },
+      contentType: 'application/json',
+    });
+    const result = await staleKsuidKeys({ path, maxage: 1, oada });
+    await oada.delete({ path: `${path}/${oldKSUID}` });
+    t.is(result.status, 'failure');
+  } finally {
+    await oada?.delete({ path });
+  }
 });
