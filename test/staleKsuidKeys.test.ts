@@ -15,7 +15,7 @@
  * limitations under the License.
  */
 
-import { setTimeout } from 'node:timers/promises';
+import { setTimeout } from 'isomorphic-timers-promises';
 
 import test from 'ava';
 
