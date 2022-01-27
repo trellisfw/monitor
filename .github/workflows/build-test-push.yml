@@ -1,4 +1,4 @@
-# Copyright 2021 Qlever LLC
+# Copyright 2022 Qlever LLC
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -12,14 +12,24 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-name: Build and push docker image
+name: Build, test, and push service images
 
 on:
   push:
   pull_request:
 
 jobs:
-  call-build-and-push-service:
+  yarn:
+    name: yarn CI
+    uses: qlever-llc/workflows/.github/workflows/build-and-publish-package.yml@master
+    with:
+      oada: true
+      publish: false
+  docker:
+    name: Docker CI
+    # Wait for yarn tests to pass?
+    needs:
+      - yarn
     uses: qlever-llc/workflows/.github/workflows/build-and-push-service.yml@master
     secrets:
       dockerhub_username: ${{ secrets.DOCKERHUB_USERNAME }}
