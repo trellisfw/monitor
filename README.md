@@ -1,6 +1,6 @@
 # trellisfw/monitor
 
-[![License](https://img.shields.io/github/license/trellisfw/trellis-monitor)](LICENSE)
+[![License](https://img.shields.io/github/license/trellisfw/monitor)](LICENSE)
 [![Docker Pulls](https://img.shields.io/docker/pulls/trellisfw/monitor)][dockerhub]
 
 This service can monitor an OADA/Trellis installation on a schedule and alert if something fails.

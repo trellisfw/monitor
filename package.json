@@ -7,7 +7,7 @@
   "engines": {
     "node": ">=14.0.0"
   },
-  "repository": "https://gitlab.com/qlevercompany/trellis/trellis-signer",
+  "repository": "https://gitlab.com/qlevercompany/trellis/monitor",
   "author": "Aaron Ault <aultac@gmail.com>",
   "license": "Apache-2.0",
   "scripts": {
