@@ -20,7 +20,7 @@
 import minimist from 'minimist';
 import moment from 'moment';
 
-import oada from '@oada/oada-cache';
+import { connect } from '@oada/client';
 
 const argv = minimist(process.argv.slice(2));
 
@@ -28,7 +28,7 @@ let domain = argv.d || process.env.DOMAIN || 'localhost';
 if (!domain.startsWith('http')) domain = `https://${domain}`;
 const token = argv.t || process.env.TOKEN || 'def';
 
-const con = await oada.connect({
+const con = await connect({
   token,
   domain,
   cache: false,

@@ -19,7 +19,8 @@
 
 import minimist from 'minimist';
 import moment from 'moment';
-import oada from '@oada/oada-cache';
+
+import { connect } from '@oada/client';
 
 const argv = minimist(process.argv.slice(2));
 
@@ -27,7 +28,7 @@ let domain = argv.d || process.env.DOMAIN || 'localhost';
 if (!domain.startsWith('http')) domain = `https://${domain}`;
 const token = argv.t || process.env.TOKEN || 'def';
 
-const con = await oada.connect({
+const con = await connect({
   token,
   domain,
   cache: false,
@@ -57,7 +58,6 @@ for (const key of asnkeys) {
 }
 
 console.log('Have the metas, here are the keys and dates');
-
 for (const meta of metas.sort((m) => m.modified)) {
   const day = moment(meta.modified, 'X').format('YYYY-MM-DD HH:mm:ss');
   console.log(`${meta.key}: ${day}`);

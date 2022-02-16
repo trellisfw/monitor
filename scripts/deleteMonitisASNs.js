@@ -17,9 +17,9 @@
 
 /* eslint-disable no-console */
 
-import Bluebird from 'bluebird';
 import minimist from 'minimist';
-import oada from '@oada/oada-cache';
+
+import { connect } from '@oada/client';
 
 const argv = minimist(process.argv.slice(2));
 
@@ -32,7 +32,7 @@ const token = argv.t || process.env.TOKEN || 'localhost';
 const listpath =
   argv.p || process.env.LISTPATH || '/bookmarks/services/target/jobs';
 
-const con = await oada.connect({
+const con = await connect({
   domain,
   token,
   cache: false,
@@ -45,9 +45,8 @@ console.log('Retrieved initial list resource:', list);
 const monitisKeys = Object.keys(list).filter((k) => k.match(/MONITIS/));
 console.log('Filtered keys to only MONITIS =', monitisKeys);
 
-await Bluebird.map(
-  monitisKeys,
-  async (k) => {
+await Promise.all(
+  monitisKeys.map(async (k) => {
     const path = `${listpath}/${k}`;
     console.log(`Deleting path: ${path}`);
     await con.delete({
@@ -55,8 +54,7 @@ await Bluebird.map(
       headers: { 'content-type': 'application/vnd.trellisfw.asn.sf.1+json' },
     });
     console.log(`Deleted path ${path}`);
-  },
-  { concurrency: 3 }
+  })
 );
 
 console.log('Deletion complete');
