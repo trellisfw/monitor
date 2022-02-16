@@ -17,23 +17,25 @@
 
 import { setTimeout } from 'isomorphic-timers-promises';
 
-import { setupTests } from 'ava-nock';
 import test from 'ava';
 
 import { OADAClient, connect } from '@oada/client';
 import ksuid from 'ksuid';
 
+import setup from './setup.js';
+
 import config from '../dist/config.js';
 import { maxAge } from '../dist/testers.js';
 
-const domain = config.get('oada.domain');
-const token = config.get('oada.token');
+const { domain, token } = config.get('oada');
 
-setupTests(test);
+const { string: uuid } = ksuid.randomSync();
+
+setup({ uuid });
 
 let oada: OADAClient;
 
-const path = `/resources/TRELLIS-MONITOR-TEST-${ksuid.randomSync().string}`;
+const path = `/resources/TRELLIS-MONITOR-TEST-${uuid}`;
 const delay = 1001;
 
 test.before(async () => {

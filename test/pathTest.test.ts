@@ -15,18 +15,18 @@
  * limitations under the License.
  */
 
-import { setupTests } from 'ava-nock';
 import test from 'ava';
 
 import { OADAClient, connect } from '@oada/client';
 
+import setup from './setup.js';
+
 import config from '../dist/config.js';
 import { pathTest } from '../dist/testers.js';
 
-const domain = config.get('oada.domain');
-const token = config.get('oada.token');
+const { domain, token } = config.get('oada');
 
-setupTests(test);
+setup();
 
 let oada: OADAClient;
 

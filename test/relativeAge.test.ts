@@ -17,31 +17,31 @@
 
 import { setTimeout } from 'isomorphic-timers-promises';
 
-import { setupTests } from 'ava-nock';
 import test from 'ava';
 
 import { OADAClient, connect } from '@oada/client';
 import ksuid from 'ksuid';
 
+import setup from './setup.js';
+
 import config from '../dist/config.js';
 import { relativeAge } from '../dist/testers.js';
 
-const domain = config.get('oada.domain');
-const token = config.get('oada.token');
+const { domain, token } = config.get('oada');
 
-setupTests(test);
+const { string: leaderID } = ksuid.randomSync();
+const { string: fastID } = ksuid.randomSync();
+const { string: slowID } = ksuid.randomSync();
+
+setup();
 
 let oada: OADAClient;
 
 test.after(async () => oada?.disconnect());
-const leader = `/resources/TRELLIS-MONITOR-TEST-${ksuid.randomSync().string}`;
+const leader = `/resources/TRELLIS-MONITOR-TEST-${leaderID}`;
 const delay = 1000;
-const fastFollower = `/resources/TRELLIS-MONITOR-TEST-${
-  ksuid.randomSync().string
-}`;
-const slowFollower = `/resources/TRELLIS-MONITOR-TEST-${
-  ksuid.randomSync().string
-}`;
+const fastFollower = `/resources/TRELLIS-MONITOR-TEST-${fastID}`;
+const slowFollower = `/resources/TRELLIS-MONITOR-TEST-${slowID}`;
 
 test.before(async () => {
   oada = await connect({ domain, token, connection: 'http' });

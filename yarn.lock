@@ -279,6 +279,7 @@ __metadata:
     micromatch: ^4.0.4
     minimist: ^1.2.5
     moment: ^2.29.1
+    nock: ^13.2.4
     node-cron: ^3.0.0
     prettier: ^2.5.1
     tiny-json-http: ^7.3.1
@@ -4411,7 +4412,7 @@ fsevents@~2.3.2:
   languageName: node
   linkType: hard
 
-"nock@npm:^13.0.11":
+"nock@npm:^13.0.11, nock@npm:^13.2.4":
   version: 13.2.4
   resolution: "nock@npm:13.2.4"
   dependencies:

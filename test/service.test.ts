@@ -15,7 +15,6 @@
  * limitations under the License.
  */
 
-import { setupTests } from 'ava-nock';
 import test from 'ava';
 
 import ksuid from 'ksuid';
@@ -23,13 +22,16 @@ import tiny from 'tiny-json-http';
 
 import { OADAClient, connect } from '@oada/client';
 
+import setup from './setup.js';
+
 import config from '../dist/config.js';
 
-const domain = config.get('oada.domain');
-const token = config.get('oada.token');
+const { domain, token } = config.get('oada');
 const incomingToken = config.get('server.token');
 
-setupTests(test);
+const { string: oldKSUID } = ksuid.randomSync(new Date('2021-02-03T01:00:00Z'));
+
+setup({ oldKSUID });
 
 const tree = {
   bookmarks: {
@@ -89,9 +91,6 @@ test.before(async (t) => {
 });
 
 test('should fail on check after posting stale asn-staging ksuid key', async (t) => {
-  const { string: oldKSUID } = await ksuid.random(
-    new Date('2021-02-03T01:00:00Z')
-  );
   const path = `/bookmarks/trellisfw/asn-staging`;
   await conn.put({
     path,
@@ -112,7 +111,7 @@ test('should fail on check after posting stale asn-staging ksuid key', async (t)
     t.is(status, 'failure');
   } catch (error: unknown) {
     // @ts-expect-error errors are annoying
-    if (error.code !== 'ECONNREFUSED') {
+    if (!['ECONNREFUSED', 'ENETUNREACH'].includes(error.code)) {
       // Service is running, but something went wrong
       throw error as Error;
     }

@@ -19,6 +19,26 @@ declare module 'isomorphic-timers-promises' {
 }
 
 declare module 'ava-nock' {
+  import { Scope } from 'nock';
   import type { TestFn } from 'ava';
-  export function setupTests(ava?: TestFn): void;
+  interface Options {
+    /** @default true */
+    decodeResponse: boolean;
+    fixtureDir: string;
+    headerFilter: Record<
+      string,
+      // eslint-disable-next-line @typescript-eslint/ban-types
+      | ((header: string) => string | null)
+      | Parameters<typeof String.prototype.replace>
+    >;
+    pathFilter: ((path: string) => string) | Parameters<Scope['filteringPath']>;
+    requestBodyFilter:
+      | ((body: string) => string)
+      | Parameters<Scope['filteringRequestBody']>;
+    responseBodyFilter:
+      | ((body: string) => string)
+      | Parameters<typeof String.prototype.replace>;
+  }
+  export function configure(options: Partial<Options>): void;
+  export function setupTests(test: TestFn): void;
 }

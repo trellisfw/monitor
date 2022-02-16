@@ -17,19 +17,28 @@
 
 import { setTimeout } from 'isomorphic-timers-promises';
 
-import { setupTests } from 'ava-nock';
 import test from 'ava';
 
 import { OADAClient, connect } from '@oada/client';
 import ksuid from 'ksuid';
 
+import setup from './setup.js';
+
 import config from '../dist/config.js';
 import { staleKsuidKeys } from '../dist/testers.js';
 
-const domain = config.get('oada.domain');
-const token = config.get('oada.token');
+const { domain, token } = config.get('oada');
 
-setupTests(test);
+const { string: id1 } = ksuid.randomSync();
+const { string: id2 } = ksuid.randomSync();
+const { string: oldKSUID } = ksuid.randomSync(new Date('2021-02-03T01:00:00Z'));
+const { string: newKSUID } = ksuid.randomSync();
+
+setup({
+  id1,
+  id2,
+  oldKSUID,
+});
 
 let oada: OADAClient;
 
@@ -41,13 +50,12 @@ test.after(async () => {
 });
 
 test('should have status: success for resource w/ recent ksuid key', async (t) => {
-  const path = `/resources/TRELLIS-MONITOR-TEST-${ksuid.randomSync().string}`;
+  const path = `/resources/TRELLIS-MONITOR-TEST-${id1}`;
   try {
     await oada.put({ path, data: {}, contentType: 'application/json' });
 
     await setTimeout(1001); // Wait 1 s should be sufficient to test age
 
-    const { string: newKSUID } = await ksuid.random();
     await oada.put({
       path,
       data: { [newKSUID]: true },
@@ -62,12 +70,9 @@ test('should have status: success for resource w/ recent ksuid key', async (t) =
 });
 
 test('should have status: failure for resource w/ old ksuid key', async (t) => {
-  const path = `/resources/TRELLIS-MONITOR-TEST-${ksuid.randomSync().string}`;
+  const path = `/resources/TRELLIS-MONITOR-TEST-${id2}`;
   try {
     await oada.put({ path, data: {}, contentType: 'application/json' });
-    const { string: oldKSUID } = await ksuid.random(
-      new Date('2021-02-03T01:00:00Z')
-    );
 
     await oada.put({
       path,

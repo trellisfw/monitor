@@ -15,52 +15,60 @@
  * limitations under the License.
  */
 
-import { setupTests } from 'ava-nock';
 import test from 'ava';
 
 import { OADAClient, connect } from '@oada/client';
 import ksuid from 'ksuid';
 import moment from 'moment';
 
+import setup from './setup.js';
+
 import config from '../dist/config.js';
 import { countKeys } from '../dist/testers.js';
 
-const domain = config.get('oada.domain');
-const token = config.get('oada.token');
-
-setupTests(test);
+const { domain, token } = config.get('oada');
 
 let oada: OADAClient;
 
-const parentID = `resources/TRELLIS-MONITOR-TEST-${ksuid.randomSync().string}`;
-const indexID = `resources/TRELLIS-MONITOR-TEST-${ksuid.randomSync().string}`;
+const { string: parentID } = ksuid.randomSync();
+const { string: indexID } = ksuid.randomSync();
+const parentResource = `resources/TRELLIS-MONITOR-TEST-${parentID}`;
+const indexResource = `resources/TRELLIS-MONITOR-TEST-${indexID}`;
+
+const today = moment().format('YYYY-MM-DD');
+
+setup({
+  parentID,
+  indexID,
+  today,
+});
 
 test.before(async () => {
   oada = await connect({ domain, token, connection: 'http' });
   await oada.put({
-    path: `/${indexID}`,
+    path: `/${indexResource}`,
     data: { key1: 'val1', key2: 'val2' },
     contentType: 'application/json',
   });
   await oada.put({
-    path: `/${parentID}`,
+    path: `/${parentResource}`,
     data: {
       'day-index': {
-        [moment().format('YYYY-MM-DD')]: { _id: indexID, _rev: 0 },
+        [today]: { _id: indexResource, _rev: 0 },
       },
     },
     contentType: 'application/json',
   });
 });
 test.after(async () => {
-  await oada?.delete({ path: `/${parentID}` });
-  await oada?.delete({ path: `/${indexID}` });
+  await oada?.delete({ path: `/${parentResource}` });
+  await oada?.delete({ path: `/${indexResource}` });
   await oada?.disconnect();
 });
 
 test('should have status: success and count=2 for resource w/ 2 keys', async (t) => {
   const result = await countKeys({
-    path: `/${parentID}`,
+    path: `/${parentResource}`,
     index: 'day-index',
     oada,
   });

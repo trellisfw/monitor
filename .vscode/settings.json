@@ -37,6 +37,9 @@
     ".pnp.*": true,
     ".vim": true
   },
+  "files.associations": {
+    ".nock": "json"
+  },
   "eslint.packageManager": "yarn",
   "eslint.useESLintClass": true,
   "licenser.author": "Qlever LLC",
