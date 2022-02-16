@@ -17,6 +17,7 @@
 
 import { setTimeout } from 'isomorphic-timers-promises';
 
+import { setupTests } from 'ava-nock';
 import test from 'ava';
 
 import { OADAClient, connect } from '@oada/client';
@@ -27,6 +28,8 @@ import { relativeAge } from '../dist/testers.js';
 
 const domain = config.get('oada.domain');
 const token = config.get('oada.token');
+
+setupTests(test);
 
 let oada: OADAClient;
 
@@ -42,6 +45,7 @@ const slowFollower = `/resources/TRELLIS-MONITOR-TEST-${
 
 test.before(async () => {
   oada = await connect({ domain, token, connection: 'http' });
+
   // "slow_follower" should be stale, i.e. must be BEFORE leader writes
   await oada.put({
     path: slowFollower,

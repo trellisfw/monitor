@@ -195,104 +195,116 @@ for (const [key, rawtest] of rawtests) {
   });
 }
 
+async function updateFailures(
+  results: Map<string, TestResult>,
+  quiet: readonly string[] = []
+) {
+  failures.clear();
+  for (const [tk, r] of results) {
+    if (r.status !== 'success') {
+      failures.set(tk, r);
+    }
+  }
+
+  trace(failures, 'Results filtered to failures');
+  status.global.status = failures.size === 0 ? 'success' : 'failure';
+  status.global.lastruntime = moment().format('YYYY-MM-DD HH:mm:ss');
+
+  if (status.global.status === 'success') {
+    info('%s: Tests all successful', status.global.lastruntime);
+    return;
+  }
+
+  info(status, 'Failure: sending notification.');
+  if (notifyurl) {
+    trace("Posting message to config.get('notify.url') = %s", notifyurl);
+    try {
+      if (Array.from(failures.keys()).some((tk) => !quiet.includes(tk))) {
+        await notifySlack(notifyurl, status);
+      }
+    } catch (cError: unknown) {
+      error(cError, 'FAILED TO NOTIFY SLACK!');
+    }
+  }
+}
+
+async function doCheck(quiet: readonly string[] = []) {
+  checking = true;
+  trace('Running %d tests', tests.size);
+  const results: Map<string, TestResult> = new Map();
+  for await (const [tk, t] of tests) {
+    trace('Running test %s', tk);
+    try {
+      const runner = testers[t.type];
+      if (!runner) {
+        return {
+          status: 'failure',
+          message: `Invalid tester type ${
+            t.type
+          }.  Valid types are: ${Object.keys(testers).join(', ')}`,
+        };
+      }
+
+      results.set(
+        tk,
+        await runner({
+          oada: t.oada,
+          // @ts-expect-error stuff
+          ...t.params,
+        })
+      );
+    } catch (cError: unknown) {
+      error(cError, `Test ${tk} threw an uncaught exception`);
+      return {
+        status: 'failure',
+        message: `Uncaught exception: ${cError}`,
+      };
+    }
+  }
+
+  trace(results, 'Results of tests');
+  // "status.tests" key should have same keys as tests here, but the values are the results of that test
+  status.tests = Object.fromEntries(
+    Array.from(tests.keys(), (tk) => [tk, results.get(tk)!])
+  );
+  // Walk all the tests and augment with description from the test for any failures:
+  for (const [testkey, result] of Object.entries(status.tests)) {
+    if (result.status === 'success') {
+      // Leave success tests w/o a desc for brevity
+      continue;
+    }
+
+    if ('desc' in result) {
+      // Already has a desc from the test itself, leave it alone
+      continue;
+    }
+
+    // If there is a desc on the test, include it here
+    result.desc = tests.get(testkey)?.desc;
+  }
+
+  // Find failing tests
+  await updateFailures(results, quiet);
+}
+
 // -------------------------------------------------------
 // Trigger testing on a schedule:
 let checking = false; // Prevent concurrent check runs?
-const check = async (quiet: readonly string[] = []) => {
+async function check(quiet: readonly string[] = []) {
   if (checking) {
     // Check is already running
     return;
   }
 
   try {
-    checking = true;
-    trace('Running %d tests', tests.size);
-    const results: Map<string, TestResult> = new Map();
-    for await (const [tk, t] of tests) {
-      trace('Running test %s', tk);
-      try {
-        const runner = testers[t.type];
-        if (!runner) {
-          return {
-            status: 'failure',
-            message: `Invalid tester type ${
-              t.type
-            }.  Valid types are: ${Object.keys(testers).join(', ')}`,
-          };
-        }
-
-        results.set(
-          tk,
-          await runner({
-            oada: t.oada,
-            // @ts-expect-error stuff
-            ...t.params,
-          })
-        );
-      } catch (cError: unknown) {
-        error(cError, `Test ${tk} threw an uncaught exception`);
-        return {
-          status: 'failure',
-          message: `Uncaught exception: ${cError}`,
-        };
-      }
-    }
-
-    trace(results, 'Results of tests');
-    // "status.tests" key should have same keys as tests here, but the values are the results of that test
-    status.tests = Object.fromEntries(
-      Array.from(tests.keys(), (tk) => [tk, results.get(tk)!])
-    );
-    // Walk all the tests and augment with description from the test for any failures:
-    for (const [testkey, result] of Object.entries(status.tests)) {
-      if (result.status === 'success') {
-        // Leave success tests w/o a desc for brevity
-        continue;
-      }
-
-      if ('desc' in result) {
-        // Already has a desc from the test itself, leave it alone
-        continue;
-      }
-
-      // If there is a desc on the test, include it here
-      result.desc = tests.get(testkey)?.desc;
-    }
-
-    // Find failing tests
-    failures.clear();
-    for (const [tk, r] of results) {
-      if (r.status !== 'success') {
-        failures.set(tk, r);
-      }
-    }
-
-    trace(failures, 'Results filtered to failures');
-    status.global.status = failures.size === 0 ? 'success' : 'failure';
-    status.global.lastruntime = moment().format('YYYY-MM-DD HH:mm:ss');
-
-    if (status.global.status === 'success') {
-      info('%s: Tests all successful', status.global.lastruntime);
-      return;
-    }
-
-    info(status, 'Failure: sending notification.');
-    if (notifyurl) {
-      trace("Posting message to config.get('notify.url') = %s", notifyurl);
-      try {
-        if (Array.from(failures.keys()).some((tk) => !quiet.includes(tk))) {
-          await notifySlack(notifyurl, status);
-        }
-      } catch (cError: unknown) {
-        error(cError, 'FAILED TO NOTIFY SLACK!');
-      }
-    }
+    await doCheck(quiet);
   } catch (cError: unknown) {
     error(cError, 'check: Uncaught error from main check');
+    process.abort();
   } finally {
     checking = false;
   }
-};
+}
 
 // Run the check immediately on start, then schedule the intervals
 info('Running initial check');

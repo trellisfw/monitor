@@ -15,6 +15,7 @@
  * limitations under the License.
  */
 
+import { setupTests } from 'ava-nock';
 import test from 'ava';
 
 import { OADAClient, connect } from '@oada/client';
@@ -26,6 +27,8 @@ import { countKeys } from '../dist/testers.js';
 
 const domain = config.get('oada.domain');
 const token = config.get('oada.token');
+
+setupTests(test);
 
 let oada: OADAClient;
 

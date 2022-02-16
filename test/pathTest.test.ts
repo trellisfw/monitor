@@ -15,6 +15,7 @@
  * limitations under the License.
  */
 
+import { setupTests } from 'ava-nock';
 import test from 'ava';
 
 import { OADAClient, connect } from '@oada/client';
@@ -25,13 +26,14 @@ import { pathTest } from '../dist/testers.js';
 const domain = config.get('oada.domain');
 const token = config.get('oada.token');
 
+setupTests(test);
+
 let oada: OADAClient;
 
 test.before(async () => {
   oada = await connect({ domain, token, connection: 'http' });
 });
-
-test.after(async () => oada?.disconnect());
+test.after(async () => oada.disconnect());
 
 test('should have status: success for well-known', async (t) => {
   const result = await pathTest({

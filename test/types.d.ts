@@ -17,3 +17,8 @@
 declare module 'isomorphic-timers-promises' {
   export * from 'node:timers/promises';
 }
+
+declare module 'ava-nock' {
+  import type { TestFn } from 'ava';
+  export function setupTests(ava?: TestFn): void;
+}

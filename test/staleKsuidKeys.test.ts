@@ -17,6 +17,7 @@
 
 import { setTimeout } from 'isomorphic-timers-promises';
 
+import { setupTests } from 'ava-nock';
 import test from 'ava';
 
 import { OADAClient, connect } from '@oada/client';
@@ -28,12 +29,13 @@ import { staleKsuidKeys } from '../dist/testers.js';
 const domain = config.get('oada.domain');
 const token = config.get('oada.token');
 
+setupTests(test);
+
 let oada: OADAClient;
 
 test.before(async () => {
   oada = await connect({ domain, token, connection: 'http' });
 });
-
 test.after(async () => {
   await oada?.disconnect();
 });
@@ -62,7 +64,6 @@ test('should have status: success for resource w/ recent ksuid key', async (t) =
 test('should have status: failure for resource w/ old ksuid key', async (t) => {
   const path = `/resources/TRELLIS-MONITOR-TEST-${ksuid.randomSync().string}`;
   try {
-    oada = await connect({ domain, token, connection: 'http' });
     await oada.put({ path, data: {}, contentType: 'application/json' });
     const { string: oldKSUID } = await ksuid.random(
       new Date('2021-02-03T01:00:00Z')

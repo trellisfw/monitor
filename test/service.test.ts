@@ -15,6 +15,7 @@
  * limitations under the License.
  */
 
+import { setupTests } from 'ava-nock';
 import test from 'ava';
 
 import ksuid from 'ksuid';
@@ -27,6 +28,8 @@ import config from '../dist/config.js';
 const domain = config.get('oada.domain');
 const token = config.get('oada.token');
 const incomingToken = config.get('server.token');
+
+setupTests(test);
 
 const tree = {
   bookmarks: {
@@ -55,13 +58,14 @@ const tree = {
 // In watch mode, these tests need to wait for service to restart.  package.json adds `--delay` to
 // mocha in this case: it will wait to run our tests until we call "run".  Code for that is at bottom.
 
-let oada: OADAClient;
+let conn: OADAClient;
 test.before(async (t) => {
-  oada = await connect({ domain, token, connection: 'http' });
+  conn = await connect({ domain, token, connection: 'http' });
+
   // Setup the trees that it is expecting to be there
-  await ensurePath(`/bookmarks/trellisfw/asn-staging`, oada);
-  await ensurePath(`/bookmarks/trellisfw/asns`, oada);
-  await ensurePath(`/bookmarks/services/target/jobs`, oada);
+  await ensurePath(`/bookmarks/trellisfw/asn-staging`, conn);
+  await ensurePath(`/bookmarks/trellisfw/asns`, conn);
+  await ensurePath(`/bookmarks/services/target/jobs`, conn);
 
   async function ensurePath(path: string, oada: OADAClient) {
     try {
@@ -87,7 +91,7 @@ test('should fail on check after posting stale asn-staging ksuid key', async (t)
     new Date('2021-02-03T01:00:00Z')
   );
   const path = `/bookmarks/trellisfw/asn-staging`;
-  await oada.put({
+  await conn.put({
     path,
     data: { [oldKSUID]: { istest: true } },
     contentType: 'application/json',
@@ -117,7 +121,7 @@ test('should fail on check after posting stale asn-staging ksuid key', async (t)
   }
 
   // Cleanup the stale ksuid before testing:
-  await oada.delete({ path: `${path}/${oldKSUID}` });
+  await conn.delete({ path: `${path}/${oldKSUID}` });
   // Only perform the expectation if service is actually running:
   if (serviceIsRunning) {
     t.is(status, 'failure');
