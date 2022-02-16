@@ -63,9 +63,11 @@ test.before(async (t) => {
   conn = await connect({ domain, token, connection: 'http' });
 
   // Setup the trees that it is expecting to be there
-  await ensurePath(`/bookmarks/trellisfw/asn-staging`, conn);
-  await ensurePath(`/bookmarks/trellisfw/asns`, conn);
-  await ensurePath(`/bookmarks/services/target/jobs`, conn);
+  await Promise.all([
+    ensurePath('/bookmarks/trellisfw/asn-staging', conn),
+    ensurePath('/bookmarks/trellisfw/asns', conn),
+    ensurePath('/bookmarks/services/target/jobs', conn),
+  ]);
 
   async function ensurePath(path: string, oada: OADAClient) {
     try {
@@ -99,16 +101,15 @@ test('should fail on check after posting stale asn-staging ksuid key', async (t)
   const url = `http://localhost:${config.get('server.port')}/trigger`;
   t.log('Getting trigger at url ', url);
 
-  let serviceIsRunning = false;
   let status: unknown = '';
   try {
     const response = await tiny.get({
       url,
       headers: { authorization: `Bearer ${incomingToken}` },
     });
-    serviceIsRunning = true;
     status = response?.body?.tests?.staging_clean?.status;
     t.log('Done w/ trigger, checking body: ', response.body);
+    t.is(status, 'failure');
   } catch (error: unknown) {
     // @ts-expect-error errors are annoying
     if (error.code !== 'ECONNREFUSED') {
@@ -117,14 +118,11 @@ test('should fail on check after posting stale asn-staging ksuid key', async (t)
     }
 
     t.log('Service does not appear to be running, skipping this test');
-    serviceIsRunning = false; // Service isn't running, test is irrelevant
-  }
-
-  // Cleanup the stale ksuid before testing:
-  await conn.delete({ path: `${path}/${oldKSUID}` });
-  // Only perform the expectation if service is actually running:
-  if (serviceIsRunning) {
-    t.is(status, 'failure');
+    t.is.skip(status, 'failure');
+    return;
+  } finally {
+    // Cleanup the stale ksuid before testing:
+    await conn.delete({ path: `${path}/${oldKSUID}` });
   }
 
   t.pass();
