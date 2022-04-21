@@ -33,11 +33,14 @@ const { string: leaderID } = ksuid.randomSync();
 const { string: fastID } = ksuid.randomSync();
 const { string: slowID } = ksuid.randomSync();
 
-setup();
+setup({
+  leaderID,
+  fastID,
+  slowID,
+});
 
 let oada: OADAClient;
 
-test.after(async () => oada?.disconnect());
 const leader = `/resources/TRELLIS-MONITOR-TEST-${leaderID}`;
 const delay = 1000;
 const fastFollower = `/resources/TRELLIS-MONITOR-TEST-${fastID}`;
@@ -69,6 +72,7 @@ test.after(async () => {
   await oada.delete({ path: leader });
   await oada.delete({ path: slowFollower });
   await oada.delete({ path: fastFollower });
+  await oada?.disconnect();
 });
 
 test('should have status: success for fast follower updated after leader', async (t) => {

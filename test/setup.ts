@@ -20,6 +20,18 @@ import { fileURLToPath } from 'node:url';
 import { configure, setupTests } from 'ava-nock';
 import test from 'ava';
 
+import FakeTimers from '@sinonjs/fake-timers';
+
+// Fake the time
+FakeTimers.install({
+  now: new Date('2022-01-01T00:00:00Z'),
+  shouldAdvanceTime: true,
+  advanceTimeDelta: 10,
+});
+
+/**
+ * Set up recording and mocking of network requests
+ */
 export default function setup(
   variables: Record<string, unknown> = {},
   {
@@ -29,15 +41,12 @@ export default function setup(
     ...rest
   }: Parameters<typeof configure>[0] = {}
 ) {
-  function filterVariables(input: string, reverse = false): string {
+  function filterVariables(input: string): string {
     let output = input;
     for (const [name, value] of Object.entries(variables)) {
       const template = `{{ ${name} }}`;
-      output = reverse
-        ? // eslint-disable-next-line security/detect-non-literal-regexp
-          output.replace(new RegExp(template, 'g'), String(value))
-        : // eslint-disable-next-line security/detect-non-literal-regexp
-          output.replace(new RegExp(String(value), 'g'), template);
+      // eslint-disable-next-line security/detect-non-literal-regexp
+      output = output.replace(new RegExp(String(value), 'g'), template);
     }
 
     return output;
@@ -50,12 +59,14 @@ export default function setup(
       // Don't record tokens
       'authorization': () => null,
       // Don't record content lengths?
+      // eslint-disable-next-line @typescript-eslint/naming-convention
       'content-length': () => null,
+      'content-location': filterVariables,
       ...headerFilter,
     },
     pathFilter: filterVariables,
     requestBodyFilter: filterVariables,
-    responseBodyFilter: (...parameters) => filterVariables(...parameters, true),
+    //responseBodyFilter: filterVariables,
     ...rest,
   });
 

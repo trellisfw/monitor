@@ -38,6 +38,7 @@ setup({
   id1,
   id2,
   oldKSUID,
+  newKSUID,
 });
 
 let oada: OADAClient;

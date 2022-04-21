@@ -33,7 +33,9 @@ let oada: OADAClient;
 test.before(async () => {
   oada = await connect({ domain, token, connection: 'http' });
 });
-test.after(async () => oada.disconnect());
+test.after(async () => {
+  await oada.disconnect();
+});
 
 test('should have status: success for well-known', async (t) => {
   const result = await pathTest({

@@ -237,12 +237,13 @@ async function doCheck(quiet: readonly string[] = []) {
     try {
       const runner = testers[t.type];
       if (!runner) {
-        return {
+        results.set(tk, {
           status: 'failure',
           message: `Invalid tester type ${
             t.type
           }.  Valid types are: ${Object.keys(testers).join(', ')}`,
-        };
+        });
+        continue;
       }
 
       results.set(
@@ -255,10 +256,10 @@ async function doCheck(quiet: readonly string[] = []) {
       );
     } catch (cError: unknown) {
       error(cError, `Test ${tk} threw an uncaught exception`);
-      return {
+      results.set(tk, {
         status: 'failure',
         message: `Uncaught exception: ${cError}`,
-      };
+      });
     }
   }
 

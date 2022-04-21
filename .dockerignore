@@ -19,10 +19,13 @@
 **/GRTAGS
 **/.session*
 **/.undodir
+**/.history
+**/.dccache
 
 # Built TS etc.
-**/.test
 **/dist
+**/coverage
+**/.test
 **/*.tsbuildinfo
 
 # yarn 2 stuff

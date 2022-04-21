@@ -1,16 +1,13 @@
 {
   "extends": "@tsconfig/node16",
-  "ts-node": {
-    "compilerOptions": {
-      "rootDir": "."
-    }
-  },
   "compilerOptions": {
     "composite": true,
     "module": "esnext",
     "moduleResolution": "node",
     "removeComments": true,
+    "stripInternal": true,
     "importHelpers": true,
+    "alwaysStrict": true,
     "strict": true,
     "importsNotUsedAsValues": "error",
     "noUncheckedIndexedAccess": true,
@@ -19,7 +16,9 @@
     "noImplicitThis": true,
     "noImplicitAny": true,
     "noImplicitOverride": true,
+    "noImplicitReturns": true,
     "sourceMap": true,
+    "forceConsistentCasingInFileNames": true,
     "rootDir": "src",
     "outDir": "dist"
   },

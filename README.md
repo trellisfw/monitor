@@ -30,7 +30,7 @@ at `/trellis-monitor/trigger`.
 The token required to retrieve the current monitor status from outside is passed
 as an environment variable:
 
-```bash
+```sh
 incomingToken="02ioj3flkfs" yarn run start
 ```
 
@@ -94,20 +94,20 @@ module.exports = {
 
 To run locally:
 
-```bash
+```sh
 yarn run start
 ```
 
 To run locally in docker:
 
-```bash
+```sh
 docker-compose up -d
 ```
 
 To run as part of an OADA deployment, just grab the `docker-compose.oada.yml` and
 `support` from the release you want and drop it into your deployment:
 
-```bash
+```sh
 cd path/to/your/oada/deployment
 mkdir -p services/trellis-monitor
 cd services/trellis-monitor
