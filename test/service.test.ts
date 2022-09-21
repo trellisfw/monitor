@@ -20,7 +20,8 @@ import test from 'ava';
 import ksuid from 'ksuid';
 import tiny from 'tiny-json-http';
 
-import { OADAClient, connect } from '@oada/client';
+import type { OADAClient } from '@oada/client';
+import { connect } from '@oada/client';
 
 import setup from './setup.js';
 

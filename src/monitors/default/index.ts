@@ -23,7 +23,7 @@
 
 /* eslint-disable @typescript-eslint/naming-convention */
 
-import type { Test } from '../../';
+import type { Test } from '../../index.js';
 
 export const well_known_ssl: Test = {
   desc: 'Is well-known up with valid SSL?',

@@ -17,7 +17,8 @@
 
 import test from 'ava';
 
-import { OADAClient, connect } from '@oada/client';
+import type { OADAClient } from '@oada/client';
+import { connect } from '@oada/client';
 import ksuid from 'ksuid';
 import moment from 'moment';
 

@@ -59,5 +59,19 @@
     "Snyk",
     "sonarjs",
     "trellisfw"
+  ],
+  "npm.packageManager": "yarn",
+  "debug.javascript.autoAttachFilter": "smart",
+  "debug.javascript.breakOnConditionalError": true,
+  "debug.javascript.defaultRuntimeExecutable": {
+    "node": "yarn",
+    "pwa-node": "yarn"
+  },
+  "debug.javascript.autoAttachSmartPattern": [
+    "${workspaceFolder}/**",
+    "!**/node_modules/**",
+    "**/$KNOWN_TOOLS$/**",
+    "!**/yarn-*",
+    "!**/ava-*/**/cli.mjs"
   ]
 }

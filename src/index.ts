@@ -24,7 +24,7 @@ import express from 'express';
 import micromatch from 'micromatch';
 import moment from 'moment';
 
-import { OADAClient, connect } from '@oada/client';
+import { type OADAClient, connect } from '@oada/client';
 
 // eslint-disable-next-line import/no-namespace
 import * as testers from './testers.js';
@@ -124,22 +124,20 @@ const status: Status = {
   },
   tests: {},
 };
-const failures: Map<string, TestResult> = new Map();
+const failures = new Map<string, TestResult>();
 
 // Load monitor tests
-const rawtests: Map<string, Test> = new Map();
+const rawtests = new Map<string, Test>();
 info('Loading all monitor tests from %s', testdir);
 const testfiles = await readdir(testdir);
-for (const t of testfiles) {
+for await (const t of testfiles) {
   const file = join(testdir, t);
 
   // Load tests from file
   let testsFile: Record<string, Test>;
   try {
-    // eslint-disable-next-line no-await-in-loop
     testsFile = (await import(file)) as Record<string, Test>;
   } catch {
-    // eslint-disable-next-line no-await-in-loop
     testsFile = (await import(join(file, 'index.js'))) as Record<string, Test>;
   }
 
@@ -162,9 +160,9 @@ for (const t of testfiles) {
 
 // Add default domain/token to any tests that do not have it,
 // and while we're at it open oada connections for all unique domain/token pairs
-const tests: Map<string, ValidTest> = new Map();
-const oadaPool: Map<string, OADAClient> = new Map();
-for (const [key, rawtest] of rawtests) {
+const tests = new Map<string, ValidTest>();
+const oadaPool = new Map<string, OADAClient>();
+for await (const [key, rawtest] of rawtests) {
   const d = rawtest.domain ?? domain;
   const t = rawtest.token ?? tokenToRequestAgainstOADA;
   const pi = `${d}::${t}`; // Index into oada connection pool (same connection for same domain/token)
@@ -173,7 +171,6 @@ for (const [key, rawtest] of rawtests) {
     try {
       oadaPool.set(
         pi,
-        // eslint-disable-next-line no-await-in-loop
         await connect({
           domain: d,
           token: t,
@@ -231,7 +228,7 @@ async function updateFailures(
 async function doCheck(quiet: readonly string[] = []) {
   checking = true;
   trace('Running %d tests', tests.size);
-  const results: Map<string, TestResult> = new Map();
+  const results = new Map<string, TestResult>();
   for await (const [tk, t] of tests) {
     trace('Running test %s', tk);
     try {

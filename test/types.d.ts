@@ -19,7 +19,7 @@ declare module 'isomorphic-timers-promises' {
 }
 
 declare module 'ava-nock' {
-  import { Scope } from 'nock';
+  import type { Scope } from 'nock';
   import type { TestFn } from 'ava';
   interface Options {
     /** @default true */

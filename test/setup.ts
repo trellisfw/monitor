@@ -66,7 +66,7 @@ export default function setup(
     },
     pathFilter: filterVariables,
     requestBodyFilter: filterVariables,
-    //responseBodyFilter: filterVariables,
+    // ResponseBodyFilter: filterVariables,
     ...rest,
   });
 
