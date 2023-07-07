@@ -36,7 +36,7 @@
     "@oada/client": "4.3.2",
     "convict": "^6.2.3",
     "debug": "^4.3.4",
-    "dotenv": "^16.0.2",
+    "dotenv": "^16.1.4",
     "express": "^4.18.1",
     "ksuid": "^3.0.0",
     "micromatch": "^4.0.5",
