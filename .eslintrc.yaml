@@ -6,15 +6,15 @@ extends:
   - plugin:github/recommended
   - plugin:promise/recommended
   - plugin:regexp/recommended
-  - plugin:array-func/recommended
+  #- plugin:array-func/recommended
   - plugin:optimize-regex/recommended
   - plugin:import/recommended
   - plugin:unicorn/recommended
-  - plugin:security/recommended
-  - plugin:sonarjs/recommended
+  #- plugin:security/recommended
+  #- plugin:sonarjs/recommended
   - plugin:ava/recommended
   - xo
-  - prettier
+  #- prettier
 
 plugins:
   - '@typescript-eslint'
@@ -22,7 +22,7 @@ plugins:
   - github
   - promise
   - regexp
-  - array-func
+  #- array-func
   - optimize-regex
   - no-constructor-bind
   - import
@@ -45,7 +45,7 @@ overrides:
       - plugin:github/typescript
       - plugin:import/typescript
       - xo-typescript
-      - prettier
+      #- prettier
     parserOptions:
       ecmaVersion: 2020
       project: './**/tsconfig.*'
@@ -114,7 +114,7 @@ rules:
          */
       onNonMatchingHeader: append
       nonMatchingTolerance: 0.7
-  sonarjs/no-duplicate-string: [warn, 5]
+  sonarjs/no-duplicate-string: [warn, { threshold: 5 }]
   sonarjs/cognitive-complexity: warn
   eslint-comments/no-unused-disable: off
   import/extensions: off

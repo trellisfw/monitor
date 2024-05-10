@@ -28,11 +28,11 @@ import type { Test } from '../../index.js';
 export const well_known_ssl: Test = {
   desc: 'Is well-known up with valid SSL?',
   type: 'pathTest',
-  params: { path: `/.well-known/oada-configuration` },
+  params: { path: '/.well-known/oada-configuration' },
 };
 
 export const bookmarks: Test = {
   desc: 'Is bookmarks up for our token?',
   type: 'pathTest',
-  params: { path: `/bookmarks` },
+  params: { path: '/bookmarks' },
 };

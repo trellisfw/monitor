@@ -174,7 +174,7 @@ for await (const [key, rawtest] of rawtests) {
         await connect({
           domain: d,
           token: t,
-        })
+        }),
       );
     } catch (cError: unknown) {
       error(cError, `Failed to connect to OADA for domain ${d} and token ${t}`);
@@ -194,7 +194,7 @@ for await (const [key, rawtest] of rawtests) {
 
 async function updateFailures(
   results: Map<string, TestResult>,
-  quiet: readonly string[] = []
+  quiet: readonly string[] = [],
 ) {
   failures.clear();
   for (const [tk, r] of results) {
@@ -249,7 +249,7 @@ async function doCheck(quiet: readonly string[] = []) {
           oada: t.oada,
           // @ts-expect-error stuff
           ...t.params,
-        })
+        }),
       );
     } catch (cError: unknown) {
       error(cError, `Test ${tk} threw an uncaught exception`);
@@ -263,7 +263,7 @@ async function doCheck(quiet: readonly string[] = []) {
   trace(results, 'Results of tests');
   // "status.tests" key should have same keys as tests here, but the values are the results of that test
   status.tests = Object.fromEntries(
-    Array.from(tests.keys(), (tk) => [tk, results.get(tk)!])
+    Array.from(tests.keys(), (tk) => [tk, results.get(tk)!]),
   );
   // Walk all the tests and augment with description from the test for any failures:
   for (const [testkey, result] of Object.entries(status.tests)) {
@@ -309,7 +309,7 @@ info('Running initial check');
 await check();
 info(
   'Completed initial check, starting re-check on cron string %s',
-  notifyCron
+  notifyCron,
 );
 
 cron.schedule(notifyCron, async () => check(Array.from(failures.keys())));
@@ -340,7 +340,7 @@ app.get('/', async (request, response) => {
 
   info(
     status.global.status,
-    'Responding to request with current global status'
+    'Responding to request with current global status',
   );
   response.json(status);
 
@@ -364,7 +364,7 @@ app.get('/trigger', async (request, response) => {
   await check();
   info(
     status.global.status,
-    'trigger: Responding to request with current global status'
+    'trigger: Responding to request with current global status',
   );
   response.json(status);
 

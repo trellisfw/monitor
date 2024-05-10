@@ -25,7 +25,10 @@ import { connect } from '@oada/client';
 const argv = minimist(process.argv.slice(2));
 
 let domain = argv.d || process.env.DOMAIN || 'localhost';
-if (!domain.startsWith('http')) domain = `https://${domain}`;
+if (!domain.startsWith('http')) {
+  domain = `https://${domain}`;
+}
+
 const token = argv.t || process.env.TOKEN || 'def';
 
 const con = await connect({
@@ -38,7 +41,7 @@ const con = await connect({
 const { data: asns } = await con.get({ path: '/bookmarks/trellisfw/asns' });
 
 const asnkeys = Object.keys(asns).filter(
-  (k) => !(/MONITIS/.test(k) || !k.startsWith('_'))
+  (k) => !(/MONITIS/.test(k) || !k.startsWith('_')),
 );
 
 console.log(`Getting ${asnkeys.length} ASNs`);

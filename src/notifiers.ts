@@ -29,7 +29,7 @@ export const notifySlack = async (notifyurl: string, status: unknown) => {
         type: 'section',
         text: {
           type: 'mrkdwn',
-          text: `*trellis-monitor detected failure*`,
+          text: '*trellis-monitor detected failure*',
         },
       },
       {

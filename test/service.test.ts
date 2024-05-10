@@ -85,14 +85,14 @@ test.before(async (t) => {
 
       t.log(
         `ERROR: ensurePath: HEAD to path ${path} returned non-404 error status:`,
-        error
+        error,
       );
     }
   }
 });
 
 test('should fail on check after posting stale asn-staging ksuid key', async (t) => {
-  const path = `/bookmarks/trellisfw/asn-staging`;
+  const path = '/bookmarks/trellisfw/asn-staging';
   await conn.put({
     path,
     data: { [oldKSUID]: { istest: true } },

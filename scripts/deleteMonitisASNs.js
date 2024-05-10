@@ -54,7 +54,7 @@ await Promise.all(
       headers: { 'content-type': 'application/vnd.trellisfw.asn.sf.1+json' },
     });
     console.log(`Deleted path ${path}`);
-  })
+  }),
 );
 
 console.log('Deletion complete');

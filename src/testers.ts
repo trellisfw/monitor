@@ -72,13 +72,13 @@ const maxAge = async ({
       'maxAge: modified = %d msec, now = %d, difference = %d',
       modified,
       now,
-      age
+      age,
     );
     if (age > maxage) {
       return {
         status: 'failure',
         message: `Age of path ${path} at modified time ${moment(
-          modified
+          modified,
         ).format(fmt)} has age ${age} which is older than maxage ${maxage}`,
       };
     }
@@ -89,7 +89,7 @@ const maxAge = async ({
     return {
       status: 'failure',
       message: `Failed in retrieving age of path ${path}. Error was: ${stringError(
-        cError
+        cError,
       )}`,
     };
   }
@@ -111,7 +111,7 @@ const relativeAge = async ({
       'relativeAge: testing age of leader %s vs. follower %s against maxage %d',
       leader,
       follower,
-      maxage
+      maxage,
     );
     const { data: leaderData } = await oada.get({
       path: `${leader}/_meta/modified`,
@@ -133,7 +133,7 @@ const relativeAge = async ({
       leadermodified,
       followermodified,
       now,
-      leaderage
+      leaderage,
     );
     if (leaderage > maxage && relativeage < 0) {
       // Leader has waited long enough for follower, but follower is still behind
@@ -149,7 +149,7 @@ const relativeAge = async ({
     return {
       status: 'failure',
       message: `Failed in retrieving age of leader or follower. Error was: ${stringError(
-        cError
+        cError,
       )}`,
     };
   }
@@ -169,7 +169,7 @@ const staleKsuidKeys = async ({
     trace('staleKsuidKeys: testing %s against maxage %d', path, maxage);
     const { data: list } = await oada.get({ path });
     const keys = Object.keys(list as Record<string, unknown>).filter(
-      (k) => !k.startsWith('_')
+      (k) => !k.startsWith('_'),
     );
     if (keys.length <= 0) {
       return { status: 'success' };
@@ -183,18 +183,17 @@ const staleKsuidKeys = async ({
         'staleKsuidKeys: now %d - ksuid date %d = %d',
         now,
         t.date.valueOf(),
-        now - t.date.valueOf()
+        now - t.date.valueOf(),
       );
       return now - t.date.valueOf() > maxage * 1000;
     });
     if (errors.length > 0) {
       return {
         status: 'failure',
-        message: `Had ${
-          errors.length
-        } ksuid keys beyond maxage of ${maxage}: ${JSON.stringify(
-          errors.map((aError) => aError.string)
-        )}`,
+        message: `Had ${errors.length
+          } ksuid keys beyond maxage of ${maxage}: ${JSON.stringify(
+            errors.map((aError) => aError.string),
+          )}`,
       };
     }
 
@@ -204,7 +203,7 @@ const staleKsuidKeys = async ({
     return {
       status: 'failure',
       message: `Failed to retrieve list of keys from path ${path}. Error was: ${stringError(
-        cError
+        cError,
       )}`,
     };
   }
@@ -223,20 +222,23 @@ const countKeys = async ({
     if (index) {
       // eslint-disable-next-line sonarjs/no-small-switch
       switch (index) {
-        case 'day-index':
+        case 'day-index': {
           path = `${path}/day-index/${moment().format('YYYY-MM-DD')}`;
           break;
-        default:
+        }
+
+        default: {
           return {
             status: 'failure',
             message: `Unknown type of index passed ${index}`,
           };
+        }
       }
     }
 
     const { data: response } = await oada.get({ path });
     const keys = Object.keys(response as Record<string, unknown>).filter(
-      (k) => !k.startsWith('_')
+      (k) => !k.startsWith('_'),
     );
     return {
       status: 'success',
@@ -253,7 +255,7 @@ const countKeys = async ({
     return {
       status: 'failure',
       message: `Failed to count keys from path ${path}. Error was: ${stringError(
-        cError
+        cError,
       )}`,
     };
   }
@@ -265,7 +267,6 @@ function stringError(aError: unknown) {
   }
 
   if ('message' in aError) {
-    // @ts-expect-error stupid error checks
     return aError.message as string;
   }
 

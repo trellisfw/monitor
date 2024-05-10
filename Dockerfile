@@ -1,4 +1,4 @@
-ARG NODE_VER=16-alpine
+ARG NODE_VER=20-alpine
 ARG SERVICE=trellisfw/monitor
 
 FROM node:$NODE_VER AS install
@@ -27,7 +27,7 @@ ARG SERVICE
 
 # Install needed packages
 RUN apk add --no-cache \
-    dumb-init
+  dumb-init
 
 # Do not run service as root
 USER node

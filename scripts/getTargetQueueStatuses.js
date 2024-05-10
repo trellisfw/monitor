@@ -25,7 +25,10 @@ import { connect } from '@oada/client';
 const argv = minimist(process.argv.slice(2));
 
 let domain = argv.d || process.env.DOMAIN || 'localhost';
-if (!domain.startsWith('http')) domain = `https://${domain}`;
+if (!domain.startsWith('http')) {
+  domain = `https://${domain}`;
+}
+
 const token = argv.t || process.env.TOKEN || 'def';
 
 const con = await connect({
@@ -40,7 +43,7 @@ const { data: asns } = await con.get({
 });
 
 const asnkeys = Object.keys(asns).filter(
-  (k) => !(/MONITIS/.test(k) || !k.startsWith('_'))
+  (k) => !(/MONITIS/.test(k) || !k.startsWith('_')),
 );
 
 console.log(`Getting ${asnkeys.length} ASNs`);
@@ -60,7 +63,7 @@ for (const key of asnkeys) {
 }
 
 console.log(
-  'Have the metas, here are the target entries, sorted with oldest on top'
+  'Have the metas, here are the target entries, sorted with oldest on top',
 );
 for (const meta of metas.sort((m) => m.modified)) {
   const day = moment(meta.modified, 'X').format('YYYY-MM-DD HH:mm:ss');
@@ -68,6 +71,8 @@ for (const meta of metas.sort((m) => m.modified)) {
     '%s: %s, %O',
     meta.key,
     day,
-    meta.services.target ? meta.services.target.tasks : 'NO TARGET META ENTRY!!'
+    meta.services.target
+      ? meta.services.target.tasks
+      : 'NO TARGET META ENTRY!!',
   );
 }
