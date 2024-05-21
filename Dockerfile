@@ -15,17 +15,30 @@
 ARG NODE_VER=20-alpine
 ARG DIR=/usr/src/app/
 
-FROM node:$NODE_VER AS install
+FROM node:$NODE_VER AS base
 ARG DIR
+
+# Install needed packages
+RUN apk add --no-cache \
+  dumb-init
 
 WORKDIR ${DIR}
 
 COPY ./.yarn ${DIR}.yarn
 COPY ./package.json ./yarn.lock ./.yarnrc.yml ${DIR}
 
+RUN chown -R node:node ${DIR}
+# Do not run service as root
+USER node
+
 RUN yarn workspaces focus --all --production
 
-FROM install AS build
+# Launch entrypoint with dumb-init
+# Remap SIGTERM to SIGINT https://github.com/Yelp/dumb-init#signal-rewriting
+ENTRYPOINT ["/usr/bin/dumb-init", "--rewrite", "15:2", "--", "yarn", "run"]
+CMD ["start"]
+
+FROM base AS build
 ARG DIR
 
 # Install dev deps too
@@ -33,25 +46,11 @@ RUN yarn install --immutable
 
 COPY . ${DIR}
 
-# Build code and remove dev deps
-RUN yarn build --verbose && rm -rfv .yarn .pnp*
+# Build code
+RUN yarn build --verbose
 
-FROM node:$NODE_VER AS production
+FROM base AS production
 ARG DIR
 
-# Install needed packages
-RUN apk add --no-cache \
-  dumb-init
-
-# Do not run service as root
-USER node
-
-WORKDIR ${DIR}
-
-COPY --from=install ${DIR} ${DIR}
-COPY --from=build ${DIR} ${DIR}
-
-# Launch entrypoint with dumb-init
-# Remap SIGTERM to SIGINT https://github.com/Yelp/dumb-init#signal-rewriting
-ENTRYPOINT ["/usr/bin/dumb-init", "--rewrite", "15:2", "--", "yarn", "run"]
-CMD ["start"]
+# Copy in build code
+COPY --from=build ${DIR}/dist ${DIR}/dist
