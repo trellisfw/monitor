@@ -36,7 +36,7 @@ setup({ uuid });
 
 let oada: OADAClient;
 
-const path = `/resources/TRELLIS-MONITOR-TEST-${uuid}`;
+const path = `/resources/TRELLIS-MONITOR-TEST-${uuid}` as const;
 const delay = 1001;
 
 test.before(async () => {

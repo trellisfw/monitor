@@ -153,7 +153,6 @@ for await (const t of testfiles) {
       continue;
     }
 
-    // eslint-disable-next-line security/detect-object-injection
     rawtests.set(te, testsFile[te]!);
   }
 }

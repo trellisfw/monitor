@@ -20,14 +20,16 @@ import { fileURLToPath } from 'node:url';
 import { configure, setupTests } from 'ava-nock';
 import test from 'ava';
 
-import FakeTimers from '@sinonjs/fake-timers';
+// import FakeTimers from '@sinonjs/fake-timers';
 
 // Fake the time
+/*
 FakeTimers.install({
   now: new Date('2022-01-01T00:00:00Z'),
   shouldAdvanceTime: true,
   advanceTimeDelta: 10,
 });
+*/
 
 /**
  * Set up recording and mocking of network requests
@@ -45,7 +47,7 @@ export default function setup(
     let output = input;
     for (const [name, value] of Object.entries(variables)) {
       const template = `{{ ${name} }}`;
-      // eslint-disable-next-line security/detect-non-literal-regexp
+
       output = output.replaceAll(new RegExp(String(value), 'g'), template);
     }
 

@@ -190,10 +190,11 @@ const staleKsuidKeys = async ({
     if (errors.length > 0) {
       return {
         status: 'failure',
-        message: `Had ${errors.length
-          } ksuid keys beyond maxage of ${maxage}: ${JSON.stringify(
-            errors.map((aError) => aError.string),
-          )}`,
+        message: `Had ${
+          errors.length
+        } ksuid keys beyond maxage of ${maxage}: ${JSON.stringify(
+          errors.map((aError) => aError.string),
+        )}`,
       };
     }
 
@@ -220,7 +221,6 @@ const countKeys = async ({
 }): Promise<TestResult> => {
   try {
     if (index) {
-      // eslint-disable-next-line sonarjs/no-small-switch
       switch (index) {
         case 'day-index': {
           path = `${path}/day-index/${moment().format('YYYY-MM-DD')}`;
