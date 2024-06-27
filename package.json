@@ -44,7 +44,7 @@
     "moment": "^2.30.1",
     "node-cron": "^3.0.3",
     "tiny-json-http": "^7.5.1",
-    "tslib": "^2.6.2"
+    "tslib": "^2.6.3"
   },
   "devDependencies": {
     "@ava/typescript": "^5.0.0",
