@@ -15,17 +15,18 @@
  * limitations under the License.
  */
 
-import { setTimeout } from 'isomorphic-timers-promises';
+import config from '../dist/config.js';
 
 import test from 'ava';
 
+import ksuid from 'ksuid';
+import { setTimeout } from 'isomorphic-timers-promises';
+
 import type { OADAClient } from '@oada/client';
 import { connect } from '@oada/client';
-import ksuid from 'ksuid';
 
 import setup from './setup.js';
 
-import config from '../dist/config.js';
 import { staleKsuidKeys } from '../dist/testers.js';
 
 const { domain, token } = config.get('oada');

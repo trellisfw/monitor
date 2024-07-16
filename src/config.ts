@@ -15,6 +15,7 @@
  * limitations under the License.
  */
 
+// eslint-disable-next-line unicorn/import-style
 import { dirname, join } from 'node:path';
 import url from 'node:url';
 

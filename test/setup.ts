@@ -15,12 +15,13 @@
  * limitations under the License.
  */
 
+import test from 'ava';
+
 import { fileURLToPath } from 'node:url';
 
 import { configure, setupTests } from 'ava-nock';
-import test from 'ava';
 
-// import FakeTimers from '@sinonjs/fake-timers';
+// Import FakeTimers from '@sinonjs/fake-timers';
 
 // Fake the time
 /*
@@ -59,9 +60,10 @@ export default function setup(
     fixtureDir,
     headerFilter: {
       // Don't record tokens
+      // eslint-disable-next-line unicorn/no-null
       'authorization': () => null,
       // Don't record content lengths?
-      // eslint-disable-next-line @typescript-eslint/naming-convention
+      // eslint-disable-next-line @typescript-eslint/naming-convention, unicorn/no-null
       'content-length': () => null,
       'content-location': filterVariables,
       ...headerFilter,

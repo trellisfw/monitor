@@ -15,6 +15,9 @@
  * limitations under the License.
  */
 
+import config from './config.js';
+
+// eslint-disable-next-line unicorn/import-style
 import { join } from 'node:path';
 import { readdir } from 'node:fs/promises';
 
@@ -30,8 +33,6 @@ import { type OADAClient, connect } from '@oada/client';
 import * as testers from './testers.js';
 import type { TestResult as ITestResult } from './testers.js';
 import { notifySlack } from './notifiers.js';
-
-import config from './config.js';
 
 const error = debug('trellis-monitor:error');
 const info = debug('trellis-monitor:info');

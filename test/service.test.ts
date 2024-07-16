@@ -112,7 +112,7 @@ test('should fail on check after posting stale asn-staging ksuid key', async (t)
     t.is(status, 'failure');
   } catch (error: unknown) {
     // @ts-expect-error errors are annoying
-    if (!['ECONNREFUSED', 'ENETUNREACH'].includes(error.code)) {
+    if (!['ECONNREFUSED', 'ENETUNREACH'].includes(`${error.code}`)) {
       // Service is running, but something went wrong
       throw error as Error;
     }
