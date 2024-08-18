@@ -36,7 +36,7 @@
   "dependencies": {
     "@oada/client": "5.1.0",
     "convict": "^6.2.4",
-    "debug": "^4.3.5",
+    "debug": "^4.3.6",
     "dotenv": "^16.4.5",
     "express": "^4.19.2",
     "ksuid": "^3.0.0",
