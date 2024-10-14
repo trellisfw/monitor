@@ -38,7 +38,7 @@
     "convict": "^6.2.4",
     "debug": "^4.3.7",
     "dotenv": "^16.4.5",
-    "express": "^4.21.0",
+    "express": "^4.21.1",
     "ksuid": "^3.0.0",
     "micromatch": "^4.0.8",
     "moment": "^2.30.1",
