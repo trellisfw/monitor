@@ -17,6 +17,8 @@
 
 import config from './config.js';
 
+import '@oada/pino-debug';
+
 // eslint-disable-next-line unicorn/import-style
 import { join } from 'node:path';
 import { readdir } from 'node:fs/promises';
@@ -27,6 +29,7 @@ import express from 'express';
 import micromatch from 'micromatch';
 import moment from 'moment';
 
+import { Gauge, PseudoMetric } from '@oada/lib-prom';
 import { type OADAClient, connect } from '@oada/client';
 
 // eslint-disable-next-line import/no-namespace
@@ -126,6 +129,22 @@ const status: Status = {
   tests: {},
 };
 const failures = new Map<string, TestResult>();
+
+new PseudoMetric({
+  name: 'trellis_monitor_info',
+  help: 'The info of trellis monitor',
+  labels: {
+    server: notifyname,
+  },
+});
+// TODO: Labels for each separate test?
+new Gauge({
+  name: 'trellis_monitor_server_status_success',
+  help: 'The status of the server being monitored',
+  collect() {
+    this.set(status.global.status === 'success' ? 1 : 0);
+  },
+});
 
 // Load monitor tests
 const rawtests = new Map<string, Test>();

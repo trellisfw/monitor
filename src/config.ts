@@ -19,12 +19,10 @@
 import { dirname, join } from 'node:path';
 import url from 'node:url';
 
-import convict from 'convict';
-import { config as load } from 'dotenv';
+import load from '@oada/lib-config';
 
-load();
 
-const config = convict({
+const { config } = await load({
   oada: {
     domain: {
       doc: 'OADA API domain',
@@ -36,6 +34,7 @@ const config = convict({
       doc: 'OADA API token',
       format: String,
       default: 'god',
+      sensitive: true,
       env: 'TOKEN',
     },
   },
@@ -44,6 +43,7 @@ const config = convict({
       doc: 'Token expected on incoming requests',
       format: String,
       default: 'god',
+      sensitive: true,
       // TODO: fix capitalization
       env: 'incomingToken',
     },
