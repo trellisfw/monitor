@@ -39,7 +39,7 @@
     "@oada/lib-prom": "^4.0.1",
     "@oada/pino-debug": "^4.0.1",
     "debug": "^4.3.7",
-    "express": "^4.21.1",
+    "express": "^4.21.2",
     "ksuid": "^3.0.0",
     "micromatch": "^4.0.8",
     "moment": "^2.30.1",
