@@ -21,7 +21,6 @@ import url from 'node:url';
 
 import load from '@oada/lib-config';
 
-
 const { config } = await load({
   oada: {
     domain: {
